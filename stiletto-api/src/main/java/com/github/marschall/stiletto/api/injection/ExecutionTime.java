@@ -10,8 +10,6 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(PARAMETER)
-public @interface ArgumentCount {
-
-    // int, short
+public @interface ExecutionTime {
 
 }

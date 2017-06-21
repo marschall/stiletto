@@ -1,6 +1,6 @@
-package com.github.marschall.stiletto.api.injection;
+package com.github.marschall.stiletto.api.joinpoint;
 
-import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Documented;
@@ -9,9 +9,7 @@ import java.lang.annotation.Target;
 
 @Documented
 @Retention(RUNTIME)
-@Target(PARAMETER)
-public @interface ArgumentCount {
-
-    // int, short
+@Target(METHOD)
+public @interface DoNotIntercept {
 
 }

@@ -21,6 +21,7 @@
   <modules>
     <module>stiletto-api</module>
     <module>stiletto-processor</module>
+    <module>stiletto-demo</module>
   </modules>
 
   <developers>

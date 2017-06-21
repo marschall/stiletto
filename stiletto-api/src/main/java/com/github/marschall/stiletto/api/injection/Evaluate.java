@@ -10,8 +10,8 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(PARAMETER)
-public @interface ArgumentCount {
+public @interface Evaluate {
 
-    // int, short
+  String value();
 
 }
