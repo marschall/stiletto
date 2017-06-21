@@ -3,16 +3,13 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.marschall</groupId>
   <artifactId>stiletto</artifactId>
-  <version>0.3.0-SNAPSHOT</version>
+  <version>0.1.0-SNAPSHOT</version>
   <inceptionYear>2017</inceptionYear>
   <name>Stiletto</name>
   <description>AOP without runtime reflection.</description>
+  <packaging>pom</packaging>
 
-  <prerequisites>
-    <maven>3.0.3</maven>
-  </prerequisites>
-
-  <url>https://github.com/marschall/junit-lambda</url>
+  <url>https://github.com/marschall/stiletto</url>
 
   <scm>
     <connection>scm:git:git@github.com:marschall/stiletto.git</connection>
@@ -20,6 +17,11 @@
     <url>${project.url}</url>
     <tag>HEAD</tag>
   </scm>
+
+  <modules>
+    <module>stiletto-api</module>
+    <module>stiletto-processor</module>
+  </modules>
 
   <developers>
     <developer>
@@ -40,15 +42,6 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-
-  <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.12</version>
-      <scope>provided</scope>
-    </dependency>
-  </dependencies>
   
   <distributionManagement>
     <snapshotRepository>
