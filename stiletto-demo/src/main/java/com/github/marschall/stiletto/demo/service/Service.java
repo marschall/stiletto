@@ -6,4 +6,8 @@ import com.github.marschall.stiletto.demo.aspect.LoggingAspect;
 @GenerateAspect(LoggingAspect.class)
 public class Service {
 
+  public String serviceMethod(String s) {
+    return "hello " + s;
+  }
+
 }

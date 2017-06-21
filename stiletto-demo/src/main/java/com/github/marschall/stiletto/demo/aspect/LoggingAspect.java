@@ -7,12 +7,12 @@ import com.github.marschall.stiletto.api.pointcuts.Before;
 public class LoggingAspect {
 
   @Before
-  void logEntering(@MethodName String methodName) {
+  public void logEntering(@MethodName String methodName) {
     System.out.println("entering " + methodName);
   }
 
   @After
-  void logExiting(@MethodName String methodName) {
+  public void logExiting(@MethodName String methodName) {
     System.out.println("exiting " + methodName);
   }
 
