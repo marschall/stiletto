@@ -16,7 +16,8 @@ import java.lang.annotation.Target;
 @Repeatable(GenerateAspects.class)
 public @interface GenerateAspect {
 
-  // also method?
+  // TODO also method?
+  // TODO name pattern expression?
 
   Class<?> value();
 

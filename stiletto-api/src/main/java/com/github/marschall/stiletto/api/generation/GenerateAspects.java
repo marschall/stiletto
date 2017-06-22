@@ -12,6 +12,9 @@ import java.lang.annotation.Target;
 @Target(TYPE)
 public @interface GenerateAspects {
 
+  // TODO composite aspect
+  // TODO name pattern
+
   GenerateAspect[] value();
 
 }

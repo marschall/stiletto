@@ -10,8 +10,6 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(PARAMETER)
-public @interface ReturnValue {
-
-  // only for after
+public @interface MethodCall {
 
 }
