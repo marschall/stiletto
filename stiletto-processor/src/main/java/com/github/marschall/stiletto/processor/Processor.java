@@ -38,7 +38,10 @@ import javax.lang.model.util.SimpleTypeVisitor8;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 
+import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 @SupportedAnnotationTypes({GENERATE_ASPECT, GENERATE_ASPECTS})
@@ -53,6 +56,8 @@ public class Processor extends AbstractProcessor {
 
   private ExecutableElement generateAspectValueMethod;
 
+  private NamingStrategy namingStrategy;
+
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
@@ -61,16 +66,29 @@ public class Processor extends AbstractProcessor {
 
     TypeElement generateAspect = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECT);
     this.generateAspectValueMethod = getValueMethod(generateAspect);
+    this.namingStrategy = s -> s + "_";
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    Set<AspectToGenerate> toGenerate = extractAspectsToGenerate(roundEnv);
+    generateAspects(toGenerate);
+    return true;
+  }
+
+  private void generateAspects(Set<AspectToGenerate> toGenerate) {
+    for (AspectToGenerate aspectToGenerate : toGenerate) {
+      generateAspectProtected(aspectToGenerate);
+    }
+  }
+
+  private Set<AspectToGenerate> extractAspectsToGenerate(
+          RoundEnvironment roundEnv) {
     TypeElement generateAspectsType = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECTS);
     TypeElement generateAspectType = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECT);
     ExecutableElement generateAspectsValueMethod = getValueMethod(generateAspectsType);
 
     Set<AspectToGenerate> toGenerate = new HashSet<>();
-
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspectsType)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
@@ -81,7 +99,7 @@ public class Processor extends AbstractProcessor {
         for (AnnotationValue generateAspectValue : generateAspectsValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@GenerateAspect
           AnnotationMirror generateAspectMirror = generateAspectValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@GenerateAspect
           String aspectClassName = extractAspectClassName(generateAspectMirror);
-          toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass));
+          toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(generateAspectMirror)));
         }
       }
     }
@@ -90,15 +108,12 @@ public class Processor extends AbstractProcessor {
         continue;
       }
       String processedClassName = getQualifiedName(processedClass);
-      for (AnnotationMirror generateAspectAnnotation : processedClass.getAnnotationMirrors()) { // @GenerateAspect
-        String aspectClassName = extractAspectClassName(generateAspectAnnotation);
-        toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass));
+      for (AnnotationMirror generateAspectMirror : processedClass.getAnnotationMirrors()) { // @GenerateAspect
+        String aspectClassName = extractAspectClassName(generateAspectMirror);
+        toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(generateAspectMirror)));
       }
     }
-    for (AspectToGenerate aspectToGenerate : toGenerate) {
-      generateAspectProtected(aspectToGenerate);
-    }
-    return true;
+    return toGenerate;
   }
 
   private boolean validateAnnoatedClass(Element element) {
@@ -116,15 +131,15 @@ public class Processor extends AbstractProcessor {
       this.generateAspect(aspectToGenerate);
     } catch (IOException e) {
       Messager messager = this.processingEnv.getMessager();
-      messager.printMessage(Kind.ERROR, e.getMessage(), aspectToGenerate.getOrignalElement());
+      messager.printMessage(Kind.ERROR, e.getMessage(), aspectToGenerate.getAnnotatedClass());
     }
   }
 
   private void generateAspect(AspectToGenerate aspectToGenerate) throws IOException {
     Filer filer = this.processingEnv.getFiler();
-    Element orignalElement = aspectToGenerate.getOrignalElement();
-    String newClassName = generateClassName(orignalElement);
-    String packageName = getPackageName(orignalElement);
+    Element annotatedClass = aspectToGenerate.getAnnotatedClass();
+    String newClassName = generateClassName(annotatedClass);
+    String packageName = getPackageName(annotatedClass);
 
     String fullyQualified;
     if (packageName.isEmpty()) {
@@ -132,14 +147,30 @@ public class Processor extends AbstractProcessor {
     } else {
       fullyQualified = packageName + "." + newClassName;
     }
-    JavaFileObject classFile = filer.createSourceFile(fullyQualified, orignalElement);
+    JavaFileObject classFile = filer.createSourceFile(fullyQualified, annotatedClass);
 
-    TypeSpec helloWorld = TypeSpec.classBuilder(newClassName)
-            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            .addOriginatingElement(orignalElement)
+    FieldSpec delegateField = FieldSpec.builder(TypeName.get(annotatedClass.asType()), "delegate", Modifier.PRIVATE, Modifier.FINAL)
+            .build();
+    FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", Modifier.PRIVATE, Modifier.FINAL)
             .build();
 
-    JavaFile javaFile = JavaFile.builder(packageName, helloWorld)
+    MethodSpec constructor = MethodSpec.constructorBuilder()
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter(TypeName.get(annotatedClass.asType()), "delegate")
+            .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+            .addStatement("this.delegate = delegate")
+            .addStatement("this.aspect = aspect")
+            .build();
+
+    TypeSpec generatedAspect = TypeSpec.classBuilder(newClassName)
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addOriginatingElement(annotatedClass)
+            .addField(delegateField)
+            .addField(aspectField)
+            .addMethod(constructor)
+            .build();
+
+    JavaFile javaFile = JavaFile.builder(packageName, generatedAspect)
             .build();
 
     try (Writer writer = classFile.openWriter()) {
@@ -149,16 +180,22 @@ public class Processor extends AbstractProcessor {
   }
 
   private String generateClassName(Element originalClass) {
-    return getSimpleName(originalClass) +"_";
+    String simpleName = getSimpleName(originalClass);
+    return this.namingStrategy.deriveClassName(simpleName);
   }
 
   private String extractAspectClassName(AnnotationMirror generateAspect) {
     // @GenerateAspect#value()
-    AnnotationValue annotationValue = generateAspect.getElementValues().get(this.generateAspectValueMethod);
-    TypeMirror aspectClass = annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
+    TypeMirror aspectClass = extractAspectClassTypeMirror(generateAspect);
     // @GenerateAspect#value() = Aspect.class
     DeclaredType declaredType = aspectClass.accept(DeclaredTypeExtractor.INSTANCE, null);
     return getQualifiedName(declaredType.asElement());
+  }
+
+  private TypeMirror extractAspectClassTypeMirror(AnnotationMirror generateAspect) {
+    // @GenerateAspect#value()
+    AnnotationValue annotationValue = generateAspect.getElementValues().get(this.generateAspectValueMethod);
+    return annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
   }
 
   private static String getQualifiedName(Element element) {
@@ -278,16 +315,22 @@ public class Processor extends AbstractProcessor {
 
     private final String className;
     private final String apectClassName;
-    private final Element orignalElement;
+    private final Element annotatedClass;
+    private final TypeMirror aspect;
 
-    AspectToGenerate(String className, String apectClassName, Element orignalElement) {
+    AspectToGenerate(String className, String apectClassName, Element annotatedClass, TypeMirror aspect) {
       this.className = className;
       this.apectClassName = apectClassName;
-      this.orignalElement = orignalElement;
+      this.annotatedClass = annotatedClass;
+      this.aspect = aspect;
     }
 
-    Element getOrignalElement() {
-      return this.orignalElement;
+    Element getAnnotatedClass() {
+      return this.annotatedClass;
+    }
+
+    TypeMirror getAspect() {
+      return this.aspect;
     }
 
     String getClassName() {
