@@ -2,12 +2,12 @@ package com.github.marschall.stiletto.demo.service;
 
 import com.github.marschall.stiletto.demo.aspect.LoggingAspect;
 
-public class ConreteService_ extends ConreteService {
+public class IService__ implements IService {
 
-  private final ConreteService delegate;
+  private final IService__ delegate;
   private final LoggingAspect aspect;
 
-  public ConreteService_(ConreteService delegate, LoggingAspect aspect) {
+  public IService__(IService__ delegate, LoggingAspect aspect) {
     this.delegate = delegate;
     this.aspect = aspect;
   }
@@ -21,6 +21,7 @@ public class ConreteService_ extends ConreteService {
   }
 
   // TODO delegate all other methods
+  // TODO delegate default
   // TODO toString?
 
 }

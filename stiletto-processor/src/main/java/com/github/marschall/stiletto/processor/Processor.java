@@ -4,6 +4,8 @@ import static com.github.marschall.stiletto.processor.Processor.GENERATE_ASPECT;
 import static com.github.marschall.stiletto.processor.Processor.GENERATE_ASPECTS;
 import static javax.lang.model.SourceVersion.RELEASE_8;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -11,6 +13,8 @@ import java.util.Objects;
 import java.util.Set;
 
 import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.Filer;
+import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
@@ -22,6 +26,8 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
@@ -29,6 +35,11 @@ import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.lang.model.util.SimpleElementVisitor8;
 import javax.lang.model.util.SimpleTypeVisitor8;
+import javax.tools.Diagnostic.Kind;
+import javax.tools.JavaFileObject;
+
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.TypeSpec;
 
 @SupportedAnnotationTypes({GENERATE_ASPECT, GENERATE_ASPECTS})
 @SupportedSourceVersion(RELEASE_8)
@@ -61,22 +72,84 @@ public class Processor extends AbstractProcessor {
     Set<AspectToGenerate> toGenerate = new HashSet<>();
 
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspectsType)) {
+      if (!validateAnnoatedClass(processedClass)) {
+        continue;
+      }
       String processedClassName = getQualifiedName(processedClass);
       for (AnnotationMirror generateAspectsMirror : processedClass.getAnnotationMirrors()) { //@GenerateAspects
         AnnotationValue generateAspectsValue = generateAspectsMirror.getElementValues().get(generateAspectsValueMethod); //@GenerateAspects
         for (AnnotationValue generateAspectValue : generateAspectsValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@GenerateAspect
           AnnotationMirror generateAspectMirror = generateAspectValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@GenerateAspect
-          toGenerate.add(new AspectToGenerate(processedClassName, extractAspectClassName(generateAspectMirror)));
+          String aspectClassName = extractAspectClassName(generateAspectMirror);
+          toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass));
         }
       }
     }
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspectType)) {
+      if (!validateAnnoatedClass(processedClass)) {
+        continue;
+      }
       String processedClassName = getQualifiedName(processedClass);
       for (AnnotationMirror generateAspectAnnotation : processedClass.getAnnotationMirrors()) { // @GenerateAspect
-        toGenerate.add(new AspectToGenerate(processedClassName, extractAspectClassName(generateAspectAnnotation)));
+        String aspectClassName = extractAspectClassName(generateAspectAnnotation);
+        toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass));
       }
     }
+    for (AspectToGenerate aspectToGenerate : toGenerate) {
+      generateAspectProtected(aspectToGenerate);
+    }
     return true;
+  }
+
+  private boolean validateAnnoatedClass(Element element) {
+    TypeElement typeElement = element.accept(TypeElementExtractor.INSTANCE, null);
+    boolean valid = typeElement.getNestingKind() == NestingKind.TOP_LEVEL;
+    if (!valid) {
+      Messager messager = this.processingEnv.getMessager();
+      messager.printMessage(Kind.ERROR, "only top level types are supported", typeElement);
+    }
+    return valid;
+  }
+
+  private void generateAspectProtected(AspectToGenerate aspectToGenerate) {
+    try {
+      this.generateAspect(aspectToGenerate);
+    } catch (IOException e) {
+      Messager messager = this.processingEnv.getMessager();
+      messager.printMessage(Kind.ERROR, e.getMessage(), aspectToGenerate.getOrignalElement());
+    }
+  }
+
+  private void generateAspect(AspectToGenerate aspectToGenerate) throws IOException {
+    Filer filer = this.processingEnv.getFiler();
+    Element orignalElement = aspectToGenerate.getOrignalElement();
+    String newClassName = generateClassName(orignalElement);
+    String packageName = getPackageName(orignalElement);
+
+    String fullyQualified;
+    if (packageName.isEmpty()) {
+      fullyQualified = newClassName;
+    } else {
+      fullyQualified = packageName + "." + newClassName;
+    }
+    JavaFileObject classFile = filer.createSourceFile(fullyQualified, orignalElement);
+
+    TypeSpec helloWorld = TypeSpec.classBuilder(newClassName)
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addOriginatingElement(orignalElement)
+            .build();
+
+    JavaFile javaFile = JavaFile.builder(packageName, helloWorld)
+            .build();
+
+    try (Writer writer = classFile.openWriter()) {
+      javaFile.writeTo(writer);
+    }
+
+  }
+
+  private String generateClassName(Element originalClass) {
+    return getSimpleName(originalClass) +"_";
   }
 
   private String extractAspectClassName(AnnotationMirror generateAspect) {
@@ -90,6 +163,20 @@ public class Processor extends AbstractProcessor {
 
   private static String getQualifiedName(Element element) {
     return element.accept(TypeElementExtractor.INSTANCE, null).getQualifiedName().toString();
+  }
+
+  private static String getSimpleName(Element element) {
+    return element.accept(TypeElementExtractor.INSTANCE, null).getSimpleName().toString();
+  }
+
+  private static String getPackageName(Element element) {
+    String qualifiedName = getQualifiedName(element);
+    String simpleName = getSimpleName(element);
+    if (qualifiedName.length() == simpleName.length()) {
+      return "";
+    }
+    // FIXME charsequence#length()
+    return qualifiedName.substring(0, qualifiedName.length() - simpleName.length() - 1);
   }
 
   private ExecutableElement getValueMethod(TypeElement typeElement) {
@@ -191,10 +278,20 @@ public class Processor extends AbstractProcessor {
 
     private final String className;
     private final String apectClassName;
+    private final Element orignalElement;
 
-    AspectToGenerate(String className, String apectClassName) {
+    AspectToGenerate(String className, String apectClassName, Element orignalElement) {
       this.className = className;
       this.apectClassName = apectClassName;
+      this.orignalElement = orignalElement;
+    }
+
+    Element getOrignalElement() {
+      return this.orignalElement;
+    }
+
+    String getClassName() {
+      return this.className;
     }
 
     @Override
