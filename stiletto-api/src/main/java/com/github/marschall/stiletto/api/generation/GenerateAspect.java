@@ -16,14 +16,16 @@ import java.lang.annotation.Target;
 @Repeatable(GenerateAspects.class)
 public @interface GenerateAspect {
 
-    Class<?> value();
+  // also method?
 
-    MethodSelection defaultMethodSelection() default ALL_PUBLIC;
+  Class<?> value();
 
-    enum MethodSelection {
-      ALL,
-      ALL_PUBLIC,
-      NONE;
-    }
+  MethodSelection defaultMethodSelection() default ALL_PUBLIC;
+
+  enum MethodSelection {
+    ALL,
+    ALL_PUBLIC,
+    NONE;
+  }
 
 }
