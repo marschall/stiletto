@@ -1,9 +1,10 @@
 package com.github.marschall.stiletto.processor;
 
-import static com.github.marschall.stiletto.processor.Processor.GENERATE_ASPECTS;
 import static com.github.marschall.stiletto.processor.Processor.GENERATE_ASPECT;
+import static com.github.marschall.stiletto.processor.Processor.GENERATE_ASPECTS;
 import static javax.lang.model.SourceVersion.RELEASE_8;
 
+import java.util.HashSet;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
@@ -18,11 +19,15 @@ import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.AnnotationValueVisitor;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
+import javax.lang.model.util.SimpleElementVisitor8;
+import javax.lang.model.util.SimpleTypeVisitor8;
 
 @SupportedAnnotationTypes({GENERATE_ASPECT, GENERATE_ASPECTS})
 @SupportedSourceVersion(RELEASE_8)
@@ -47,6 +52,8 @@ public class Processor extends AbstractProcessor {
     ExecutableElement generateAspectsValue = getValueMethod(generateAspects);
     ExecutableElement generateAspectValue = getValueMethod(generateAspect);
 
+    Set<AspectToGenerate> toGenerate = new HashSet<>();
+
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspects)) {
       for (AnnotationMirror annotation : processedClass.getAnnotationMirrors()) {
         AnnotationValue annotationValue = annotation.getElementValues().get(generateAspectsValue);
@@ -55,14 +62,21 @@ public class Processor extends AbstractProcessor {
       }
     }
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspect)) {
+      String processedClassName = getQualifiedName(processedClass);
       for (AnnotationMirror annotation : processedClass.getAnnotationMirrors()) {
         AnnotationValue annotationValue = annotation.getElementValues().get(generateAspectValue);
         TypeMirror aspectClass = annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
-        DeclaredType declaredType = (DeclaredType) aspectClass;
+        DeclaredType declaredType = aspectClass.accept(DeclaredTypeExtractor.INSTANCE, null);
+        String aspectClassName = getQualifiedName(declaredType.asElement());
+        toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName));
 //        annotationValue.
       }
     }
     return true;
+  }
+
+  private static String getQualifiedName(Element element) {
+    return element.accept(TypeElementExtractor.INSTANCE, null).getQualifiedName().toString();
   }
 
   private ExecutableElement getValueMethod(TypeElement typeElement) {
@@ -76,6 +90,46 @@ public class Processor extends AbstractProcessor {
       }
     }
     throw new NoSuchElementException("no method named: " + methodName);
+  }
+
+  static class ExpectedElementExtractor<R> extends SimpleElementVisitor8<R, Void> {
+
+    @Override
+    protected R defaultAction(Element e, Void p) {
+      throw new IllegalArgumentException("unknown element type");
+    }
+
+  }
+
+  static final class TypeElementExtractor extends ExpectedElementExtractor<TypeElement> {
+
+    static final ElementVisitor<TypeElement, Void> INSTANCE = new TypeElementExtractor();
+
+    @Override
+    public TypeElement visitType(TypeElement e, Void p) {
+      return e;
+    }
+
+  }
+
+  static class ExpectedTypeExtractor<R> extends SimpleTypeVisitor8<R, Void> {
+
+    @Override
+    protected R defaultAction(TypeMirror e, Void p) {
+      throw new IllegalArgumentException("unknown element type");
+    }
+
+  }
+
+  static final class DeclaredTypeExtractor extends ExpectedTypeExtractor<DeclaredType> {
+
+    static final TypeVisitor<DeclaredType, Void> INSTANCE = new DeclaredTypeExtractor();
+
+    @Override
+    public DeclaredType visitDeclared(DeclaredType t, Void p) {
+      return t;
+    }
+
   }
 
   static class ExpectedValueExtractor<R> extends SimpleAnnotationValueVisitor8<R, Void> {
