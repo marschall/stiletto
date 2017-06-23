@@ -1,4 +1,4 @@
-package com.github.marschall.stiletto.api.pointcuts;
+package com.github.marschall.stiletto.api.advice;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -10,8 +10,9 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(METHOD)
-public @interface Before {
+public @interface After {
 
-    // void? delegate?
+    // if void result is not changed
+    // different annotation?
 
 }

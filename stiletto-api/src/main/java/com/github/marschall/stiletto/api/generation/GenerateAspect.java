@@ -18,6 +18,8 @@ public @interface GenerateAspect {
 
   // TODO also method?
   // TODO name pattern expression?
+  // TODO on aspect instead?
+
 
   Class<?> value();
 
