@@ -1,7 +1,7 @@
 package com.github.marschall.stiletto.processor;
 
-import static com.github.marschall.stiletto.processor.Processor.GENERATE_ASPECT;
-import static com.github.marschall.stiletto.processor.Processor.GENERATE_ASPECTS;
+import static com.github.marschall.stiletto.processor.Processor.APPLY_ASPECT;
+import static com.github.marschall.stiletto.processor.Processor.APPLY_ASPECTS;
 import static javax.lang.model.SourceVersion.RELEASE_8;
 
 import java.io.IOException;
@@ -45,17 +45,17 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
-@SupportedAnnotationTypes({GENERATE_ASPECT, GENERATE_ASPECTS})
+@SupportedAnnotationTypes({APPLY_ASPECT, APPLY_ASPECTS})
 @SupportedSourceVersion(RELEASE_8)
 public class Processor extends AbstractProcessor {
 
-  static final String GENERATE_ASPECTS = "com.github.marschall.stiletto.api.generation.GenerateAspects";
+  static final String APPLY_ASPECTS = "com.github.marschall.stiletto.api.generation.ApplyAspects";
 
-  static final String GENERATE_ASPECT = "com.github.marschall.stiletto.api.generation.GenerateAspect";
+  static final String APPLY_ASPECT = "com.github.marschall.stiletto.api.generation.ApplyAspect";
 
   private ProcessingEnvironment processingEnv;
 
-  private ExecutableElement generateAspectValueMethod;
+  private ExecutableElement applyAspectValueMethod;
 
   private NamingStrategy namingStrategy;
 
@@ -67,64 +67,64 @@ public class Processor extends AbstractProcessor {
     this.processingEnv = processingEnv;
 
 
-    TypeElement generateAspect = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECT);
-    this.generateAspectValueMethod = getValueMethod(generateAspect);
+    TypeElement applyAspect = this.processingEnv.getElementUtils().getTypeElement(APPLY_ASPECT);
+    this.applyAspectValueMethod = getValueMethod(applyAspect);
     this.namingStrategy = s -> s + "_";
     this.addGenerated = true;
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-    Set<AspectToGenerate> toGenerate = extractAspectsToGenerate(roundEnv);
-    generateAspects(toGenerate);
+    Set<ProxyToGenerate> toGenerate = extractAspectsToGenerate(roundEnv);
+    generateProxies(toGenerate);
     return true;
   }
 
-  private void generateAspects(Set<AspectToGenerate> toGenerate) {
-    for (AspectToGenerate aspectToGenerate : toGenerate) {
-      generateAspectProtected(aspectToGenerate);
+  private void generateProxies(Set<ProxyToGenerate> toGenerate) {
+    for (ProxyToGenerate proxyToGenerate : toGenerate) {
+      generateProxyProtected(proxyToGenerate);
     }
   }
 
-  private Set<AspectToGenerate> extractAspectsToGenerate(RoundEnvironment roundEnv) {
-    TypeElement generateAspectsType = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECTS);
-    ExecutableElement generateAspectsValueMethod = getValueMethod(generateAspectsType);
+  private Set<ProxyToGenerate> extractAspectsToGenerate(RoundEnvironment roundEnv) {
+    TypeElement applyAspectsType = this.processingEnv.getElementUtils().getTypeElement(APPLY_ASPECTS);
+    ExecutableElement applyAspectsValueMethod = getValueMethod(applyAspectsType);
 
-    // handle @GenerateAspects
-    Set<AspectToGenerate> toGenerate = new HashSet<>();
-    for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspectsType)) {
+    // handle @ApplyAspects
+    Set<ProxyToGenerate> toGenerate = new HashSet<>();
+    for (Element processedClass : roundEnv.getElementsAnnotatedWith(applyAspectsType)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      for (AnnotationMirror generateAspectsMirror : processedClass.getAnnotationMirrors()) { //@GenerateAspects
-        AnnotationValue generateAspectsValue = generateAspectsMirror.getElementValues().get(generateAspectsValueMethod); //@GenerateAspects
-        for (AnnotationValue generateAspectValue : generateAspectsValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@GenerateAspect
-          AnnotationMirror generateAspectMirror = generateAspectValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@GenerateAspect
-          AspectToGenerate aspectToGenerate = buildAspectToGenerate(processedClass, generateAspectMirror);
-          toGenerate.add(aspectToGenerate);
+      for (AnnotationMirror applyAspectsMirror : processedClass.getAnnotationMirrors()) { //@ApplyAspects
+        AnnotationValue applyAspectsValue = applyAspectsMirror.getElementValues().get(applyAspectsValueMethod); //@ApplyAspects
+        for (AnnotationValue applyAspectValue : applyAspectsValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@ApplyAspect
+          AnnotationMirror applyAspectMirror = applyAspectValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@ApplyAspect
+          ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, applyAspectMirror);
+          toGenerate.add(proxyToGenerate);
         }
       }
     }
 
-    // handle @GenerateAspect
-    TypeElement generateAspectType = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECT);
-    for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspectType)) {
+    // handle @ApplyAspect
+    TypeElement applyAspectType = this.processingEnv.getElementUtils().getTypeElement(APPLY_ASPECT);
+    for (Element processedClass : roundEnv.getElementsAnnotatedWith(applyAspectType)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      for (AnnotationMirror generateAspectMirror : processedClass.getAnnotationMirrors()) { // @GenerateAspect
-        AspectToGenerate aspectToGenerate = buildAspectToGenerate(processedClass, generateAspectMirror);
-        toGenerate.add(aspectToGenerate);
+      for (AnnotationMirror applyAspectMirror : processedClass.getAnnotationMirrors()) { // @ApplyAspect
+        ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, applyAspectMirror);
+        toGenerate.add(proxyToGenerate);
       }
     }
 
     return toGenerate;
   }
 
-  private AspectToGenerate buildAspectToGenerate(Element processedClass, AnnotationMirror generateAspectMirror) {
+  private ProxyToGenerate buildProxyToGenerate(Element processedClass, AnnotationMirror applyAspectMirror) {
     String processedClassName = getQualifiedName(processedClass);
-    String aspectClassName = extractAspectClassName(generateAspectMirror);
-    return new AspectToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(generateAspectMirror));
+    String aspectClassName = extractAspectClassName(applyAspectMirror);
+    return new ProxyToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(applyAspectMirror));
   }
 
   private boolean validateAnnoatedClass(Element element) {
@@ -137,18 +137,18 @@ public class Processor extends AbstractProcessor {
     return valid;
   }
 
-  private void generateAspectProtected(AspectToGenerate aspectToGenerate) {
+  private void generateProxyProtected(ProxyToGenerate proxyToGenerate) {
     try {
-      this.generateAspect(aspectToGenerate);
+      this.generateProxy(proxyToGenerate);
     } catch (IOException e) {
       Messager messager = this.processingEnv.getMessager();
-      messager.printMessage(Kind.ERROR, e.getMessage(), aspectToGenerate.getAnnotatedClass());
+      messager.printMessage(Kind.ERROR, e.getMessage(), proxyToGenerate.getTargetClassElement());
     }
   }
 
-  private void generateAspect(AspectToGenerate aspectToGenerate) throws IOException {
+  private void generateProxy(ProxyToGenerate aspectToGenerate) throws IOException {
     Filer filer = this.processingEnv.getFiler();
-    Element annotatedClass = aspectToGenerate.getAnnotatedClass();
+    Element annotatedClass = aspectToGenerate.getTargetClassElement();
     String newClassName = generateClassName(annotatedClass);
     String packageName = getPackageName(annotatedClass);
 
@@ -173,6 +173,8 @@ public class Processor extends AbstractProcessor {
             .addStatement("this.aspect = aspect")
             .build();
 
+    // TODO Generated
+    // TODO JavaDoc
     TypeSpec generatedAspect = TypeSpec.classBuilder(newClassName)
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .addOriginatingElement(annotatedClass)
@@ -195,17 +197,17 @@ public class Processor extends AbstractProcessor {
     return this.namingStrategy.deriveClassName(simpleName);
   }
 
-  private String extractAspectClassName(AnnotationMirror generateAspect) {
-    // @GenerateAspect#value()
-    TypeMirror aspectClass = extractAspectClassTypeMirror(generateAspect);
-    // @GenerateAspect#value() = Aspect.class
+  private String extractAspectClassName(AnnotationMirror applyAspect) {
+    // @ApplyAspect#value()
+    TypeMirror aspectClass = extractAspectClassTypeMirror(applyAspect);
+    // @ApplyAspect#value() = Aspect.class
     DeclaredType declaredType = aspectClass.accept(DeclaredTypeExtractor.INSTANCE, null);
     return getQualifiedName(declaredType.asElement());
   }
 
-  private TypeMirror extractAspectClassTypeMirror(AnnotationMirror generateAspect) {
-    // @GenerateAspect#value()
-    AnnotationValue annotationValue = generateAspect.getElementValues().get(this.generateAspectValueMethod);
+  private TypeMirror extractAspectClassTypeMirror(AnnotationMirror applyAspect) {
+    // @ApplyAspect#value()
+    AnnotationValue annotationValue = applyAspect.getElementValues().get(this.applyAspectValueMethod);
     return annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
   }
 
@@ -334,30 +336,26 @@ public class Processor extends AbstractProcessor {
 
   }
 
-  static final class AspectToGenerate {
+  static final class ProxyToGenerate {
 
-    private final String className;
-    private final String apectClassName;
-    private final Element annotatedClass;
+    private final String targetClassName;
+    private final String aspectClassName;
+    private final Element targetClassElement;
     private final TypeMirror aspect;
 
-    AspectToGenerate(String className, String apectClassName, Element annotatedClass, TypeMirror aspect) {
-      this.className = className;
-      this.apectClassName = apectClassName;
-      this.annotatedClass = annotatedClass;
+    ProxyToGenerate(String targetClassName, String apectClassName, Element targetClassElement, TypeMirror aspect) {
+      this.targetClassName = targetClassName;
+      this.aspectClassName = apectClassName;
+      this.targetClassElement = targetClassElement;
       this.aspect = aspect;
     }
 
-    Element getAnnotatedClass() {
-      return this.annotatedClass;
+    Element getTargetClassElement() {
+      return this.targetClassElement;
     }
 
     TypeMirror getAspect() {
       return this.aspect;
-    }
-
-    String getClassName() {
-      return this.className;
     }
 
     @Override
@@ -365,22 +363,22 @@ public class Processor extends AbstractProcessor {
       if (obj == this) {
         return true;
       }
-      if (!(obj instanceof AspectToGenerate)) {
+      if (!(obj instanceof ProxyToGenerate)) {
         return false;
       }
-      AspectToGenerate other = (AspectToGenerate) obj;
-      return this.className.equals(other.className)
-              && this.apectClassName.equals(other.apectClassName);
+      ProxyToGenerate other = (ProxyToGenerate) obj;
+      return this.targetClassName.equals(other.targetClassName)
+              && this.aspectClassName.equals(other.aspectClassName);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(this.className, this.apectClassName);
+      return Objects.hash(this.targetClassName, this.aspectClassName);
     }
 
     @Override
     public String toString() {
-      return "aspect: " + this.apectClassName + " -> " + this.className;
+      return "aspect: " + this.aspectClassName + " -> " + this.targetClassName;
     }
 
   }

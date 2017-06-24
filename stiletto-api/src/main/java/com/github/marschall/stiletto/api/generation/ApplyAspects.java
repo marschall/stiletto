@@ -10,11 +10,11 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(SOURCE)
 @Target(TYPE)
-public @interface GenerateAspects {
+public @interface ApplyAspects {
 
   // TODO composite aspect
   // TODO name pattern
 
-  GenerateAspect[] value();
+  ApplyAspect[] value();
 
 }
