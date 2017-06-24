@@ -211,7 +211,16 @@ public class ProxyGenerator extends AbstractProcessor {
             .addField(aspectField)
             .addMethod(constructor);
 
-    if (isSubclassingRequired(targetClass)) {
+    if (targetClass.getKind() == ElementKind.INTERFACE) {
+      proxyClassBilder.addSuperinterface(TypeName.get(targetClass.asType()));
+      List<? extends TypeParameterElement> typeParameters = targetClass.getTypeParameters();
+      if (!typeParameters.isEmpty()) {
+        for (TypeParameterElement typeParameter : typeParameters) {
+          proxyClassBilder.addTypeVariable(TypeVariableName.get(typeParameter));
+        }
+      }
+
+    } else if (isSubclassingRequired(targetClass)) {
       proxyClassBilder.superclass(TypeName.get(targetClass.asType()));
     } else {
       for (TypeMirror superinterface : targetClass.getInterfaces()) {

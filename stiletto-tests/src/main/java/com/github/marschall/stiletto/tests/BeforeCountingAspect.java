@@ -1,6 +1,6 @@
 package com.github.marschall.stiletto.tests;
 
-import org.junit.Before;
+import com.github.marschall.stiletto.api.advice.Before;
 
 public class BeforeCountingAspect {
 
