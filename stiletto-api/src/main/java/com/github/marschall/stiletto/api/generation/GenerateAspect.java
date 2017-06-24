@@ -18,7 +18,7 @@ public @interface GenerateAspect {
 
   // TODO also method?
   // TODO name pattern expression?
-  // TODO on aspect instead?
+  // TODO on aspect instead? probably no, aspect should stay generic
 
 
   Class<?> value();
