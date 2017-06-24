@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(METHOD)
-public @interface After {
+public @interface AfterReturning {
 
     // if void result is not changed
     // different annotation?

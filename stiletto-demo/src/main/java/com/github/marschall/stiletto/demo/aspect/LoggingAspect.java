@@ -1,6 +1,6 @@
 package com.github.marschall.stiletto.demo.aspect;
 
-import com.github.marschall.stiletto.api.advice.After;
+import com.github.marschall.stiletto.api.advice.AfterReturning;
 import com.github.marschall.stiletto.api.advice.Before;
 import com.github.marschall.stiletto.api.injection.MethodName;
 
@@ -11,7 +11,7 @@ public class LoggingAspect {
     System.out.println("entering " + methodName);
   }
 
-  @After
+  @AfterReturning
   public void logExiting(@MethodName String methodName) {
     System.out.println("exiting " + methodName);
   }

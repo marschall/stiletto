@@ -10,7 +10,6 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(METHOD)
-public @interface OnThrowable {
+public @interface AfterFinally {
 
-    Class<? extends Throwable>[] values();
 }
