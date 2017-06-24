@@ -30,6 +30,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
@@ -46,6 +47,7 @@ import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
+import com.squareup.javapoet.TypeVariableName;
 import com.squareup.javapoet.TypeSpec.Builder;
 
 @SupportedAnnotationTypes({ADVISE_BY, ADVISE_BY_ALL})
@@ -99,12 +101,14 @@ public class ProxyGenerator extends AbstractProcessor {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      for (AnnotationMirror adviseByAllMirror : processedClass.getAnnotationMirrors()) { //@AdviseByAll
-        AnnotationValue adviseByAllValue = adviseByAllMirror.getElementValues().get(adviseByAllValueMethod); //@AdviseByAll
-        for (AnnotationValue adviseByValue : adviseByAllValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@AdviseBy
-          AnnotationMirror adviseByMirror = adviseByValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@AdviseBy
-          ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, adviseByMirror);
-          toGenerate.add(proxyToGenerate);
+      for (AnnotationMirror annotationMirror : processedClass.getAnnotationMirrors()) {
+        if (annotationMirror.getAnnotationType().equals(adviseByAllType.asType())) { //@AdviseByAll
+          AnnotationValue adviseByAllValue = annotationMirror.getElementValues().get(adviseByAllValueMethod); //@AdviseByAll
+          for (AnnotationValue adviseByValue : adviseByAllValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@AdviseBy
+            AnnotationMirror adviseByMirror = adviseByValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@AdviseBy
+            ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, adviseByMirror);
+            toGenerate.add(proxyToGenerate);
+          }
         }
       }
     }
@@ -115,9 +119,11 @@ public class ProxyGenerator extends AbstractProcessor {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      for (AnnotationMirror adviseByMirror : processedClass.getAnnotationMirrors()) { // @AdviseBy
-        ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, adviseByMirror);
-        toGenerate.add(proxyToGenerate);
+      for (AnnotationMirror annotationMirror : processedClass.getAnnotationMirrors()) {
+        if (annotationMirror.getAnnotationType().equals(adviseByType.asType())) { // @AdviseBy
+          ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, annotationMirror);
+          toGenerate.add(proxyToGenerate);
+        }
       }
     }
 
@@ -181,6 +187,10 @@ public class ProxyGenerator extends AbstractProcessor {
     FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", Modifier.PRIVATE, Modifier.FINAL)
             .build();
 
+    // TODO do not proxy equals and hashCode
+    // TODO do not proxy Cloneable, Seriablizable, Externalizable
+    // TODO string?
+
     // TODO if it's a class all public constructors and super call
     MethodSpec constructor = MethodSpec.constructorBuilder()
             .addModifiers(Modifier.PUBLIC)
@@ -206,6 +216,13 @@ public class ProxyGenerator extends AbstractProcessor {
     } else {
       for (TypeMirror superinterface : targetClass.getInterfaces()) {
         proxyClassBilder.addSuperinterface(TypeName.get(superinterface));
+      }
+      // TODO check interfaces from superclasses
+      List<? extends TypeParameterElement> typeParameters = targetClass.getTypeParameters();
+      if (!typeParameters.isEmpty()) {
+        for (TypeParameterElement typeParameter : typeParameters) {
+          proxyClassBilder.addTypeVariable(TypeVariableName.get(typeParameter));
+        }
       }
     }
 
