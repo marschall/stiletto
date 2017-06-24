@@ -10,6 +10,6 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(PARAMETER)
-public @interface This {
+public @interface TargetObject {
 
 }

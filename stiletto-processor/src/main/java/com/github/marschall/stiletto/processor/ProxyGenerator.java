@@ -1,7 +1,7 @@
 package com.github.marschall.stiletto.processor;
 
-import static com.github.marschall.stiletto.processor.Processor.APPLY_ASPECT;
-import static com.github.marschall.stiletto.processor.Processor.APPLY_ASPECTS;
+import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
+import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
 
 import java.io.IOException;
@@ -39,23 +39,26 @@ import javax.lang.model.util.SimpleTypeVisitor8;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 
+import com.squareup.javapoet.AnnotationSpec;
+import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
+import com.squareup.javapoet.TypeSpec.Builder;
 
-@SupportedAnnotationTypes({APPLY_ASPECT, APPLY_ASPECTS})
+@SupportedAnnotationTypes({ADVISE_BY, ADVISE_BY_ALL})
 @SupportedSourceVersion(RELEASE_8)
-public class Processor extends AbstractProcessor {
+public class ProxyGenerator extends AbstractProcessor {
 
-  static final String APPLY_ASPECTS = "com.github.marschall.stiletto.api.generation.ApplyAspects";
+  static final String ADVISE_BY_ALL = "com.github.marschall.stiletto.api.generation.AdviseByAll";
 
-  static final String APPLY_ASPECT = "com.github.marschall.stiletto.api.generation.ApplyAspect";
+  static final String ADVISE_BY = "com.github.marschall.stiletto.api.generation.AdviseBy";
 
   private ProcessingEnvironment processingEnv;
 
-  private ExecutableElement applyAspectValueMethod;
+  private ExecutableElement adviseByValueMethod;
 
   private NamingStrategy namingStrategy;
 
@@ -67,8 +70,8 @@ public class Processor extends AbstractProcessor {
     this.processingEnv = processingEnv;
 
 
-    TypeElement applyAspect = this.processingEnv.getElementUtils().getTypeElement(APPLY_ASPECT);
-    this.applyAspectValueMethod = getValueMethod(applyAspect);
+    TypeElement adviseBy = this.processingEnv.getElementUtils().getTypeElement(ADVISE_BY);
+    this.adviseByValueMethod = getValueMethod(adviseBy);
     this.namingStrategy = s -> s + "_";
     this.addGenerated = true;
   }
@@ -87,33 +90,33 @@ public class Processor extends AbstractProcessor {
   }
 
   private Set<ProxyToGenerate> extractAspectsToGenerate(RoundEnvironment roundEnv) {
-    TypeElement applyAspectsType = this.processingEnv.getElementUtils().getTypeElement(APPLY_ASPECTS);
-    ExecutableElement applyAspectsValueMethod = getValueMethod(applyAspectsType);
+    TypeElement adviseByAllType = this.processingEnv.getElementUtils().getTypeElement(ADVISE_BY_ALL);
+    ExecutableElement adviseByAllValueMethod = getValueMethod(adviseByAllType);
 
-    // handle @ApplyAspects
+    // handle @AdviseByAll
     Set<ProxyToGenerate> toGenerate = new HashSet<>();
-    for (Element processedClass : roundEnv.getElementsAnnotatedWith(applyAspectsType)) {
+    for (Element processedClass : roundEnv.getElementsAnnotatedWith(adviseByAllType)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      for (AnnotationMirror applyAspectsMirror : processedClass.getAnnotationMirrors()) { //@ApplyAspects
-        AnnotationValue applyAspectsValue = applyAspectsMirror.getElementValues().get(applyAspectsValueMethod); //@ApplyAspects
-        for (AnnotationValue applyAspectValue : applyAspectsValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@ApplyAspect
-          AnnotationMirror applyAspectMirror = applyAspectValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@ApplyAspect
-          ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, applyAspectMirror);
+      for (AnnotationMirror adviseByAllMirror : processedClass.getAnnotationMirrors()) { //@AdviseByAll
+        AnnotationValue adviseByAllValue = adviseByAllMirror.getElementValues().get(adviseByAllValueMethod); //@AdviseByAll
+        for (AnnotationValue adviseByValue : adviseByAllValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@AdviseBy
+          AnnotationMirror adviseByMirror = adviseByValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@AdviseBy
+          ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, adviseByMirror);
           toGenerate.add(proxyToGenerate);
         }
       }
     }
 
-    // handle @ApplyAspect
-    TypeElement applyAspectType = this.processingEnv.getElementUtils().getTypeElement(APPLY_ASPECT);
-    for (Element processedClass : roundEnv.getElementsAnnotatedWith(applyAspectType)) {
+    // handle @AdviseBy
+    TypeElement adviseByType = this.processingEnv.getElementUtils().getTypeElement(ADVISE_BY);
+    for (Element processedClass : roundEnv.getElementsAnnotatedWith(adviseByType)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      for (AnnotationMirror applyAspectMirror : processedClass.getAnnotationMirrors()) { // @ApplyAspect
-        ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, applyAspectMirror);
+      for (AnnotationMirror adviseByMirror : processedClass.getAnnotationMirrors()) { // @AdviseBy
+        ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, adviseByMirror);
         toGenerate.add(proxyToGenerate);
       }
     }
@@ -121,19 +124,41 @@ public class Processor extends AbstractProcessor {
     return toGenerate;
   }
 
-  private ProxyToGenerate buildProxyToGenerate(Element processedClass, AnnotationMirror applyAspectMirror) {
+  private ProxyToGenerate buildProxyToGenerate(Element processedClass, AnnotationMirror adviseByMirror) {
     String processedClassName = getQualifiedName(processedClass);
-    String aspectClassName = extractAspectClassName(applyAspectMirror);
-    return new ProxyToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(applyAspectMirror));
+    String aspectClassName = extractAspectClassName(adviseByMirror);
+    TypeElement typeElement = processedClass.accept(TypeElementExtractor.INSTANCE, null);
+    return new ProxyToGenerate(processedClassName, aspectClassName, typeElement, extractAspectClassTypeMirror(adviseByMirror));
   }
 
   private boolean validateAnnoatedClass(Element element) {
     TypeElement typeElement = element.accept(TypeElementExtractor.INSTANCE, null);
-    boolean valid = typeElement.getNestingKind() == NestingKind.TOP_LEVEL;
-    if (!valid) {
-      Messager messager = this.processingEnv.getMessager();
-      messager.printMessage(Kind.ERROR, "only top level types are supported", typeElement);
+    boolean isClass = typeElement.getKind() == ElementKind.CLASS;
+    boolean isEnum = typeElement.getKind() == ElementKind.ENUM;
+    boolean isTopLevel = typeElement.getNestingKind() == NestingKind.TOP_LEVEL;
+    Messager messager = this.processingEnv.getMessager();
+    // no need to check for annotations handled by @Target
+
+    boolean valid = true;
+
+    if (!isTopLevel) {
+      messager.printMessage(Kind.ERROR, "only top level types can be advised", typeElement);
+      valid = false;
     }
+
+    if (isClass) {
+      boolean isAbstract = typeElement.getModifiers().contains(Modifier.ABSTRACT);
+      if (isAbstract) {
+        messager.printMessage(Kind.ERROR, "advising abstract classes is not supported", typeElement);
+        valid = false;
+      }
+    }
+
+    if (isEnum) {
+      messager.printMessage(Kind.ERROR, "advising enums is not supported", typeElement);
+      valid = false;
+    }
+
     return valid;
   }
 
@@ -147,67 +172,88 @@ public class Processor extends AbstractProcessor {
   }
 
   private void generateProxy(ProxyToGenerate aspectToGenerate) throws IOException {
-    Filer filer = this.processingEnv.getFiler();
-    Element annotatedClass = aspectToGenerate.getTargetClassElement();
-    String newClassName = generateClassName(annotatedClass);
-    String packageName = getPackageName(annotatedClass);
+    TypeElement targetClass = aspectToGenerate.getTargetClassElement();
+    String proxyClassName = generateClassName(targetClass);
+    String packageName = getPackageName(targetClass);
 
-    String fullyQualified; // FIXME find method
-    if (packageName.isEmpty()) {
-      fullyQualified = newClassName;
-    } else {
-      fullyQualified = packageName + "." + newClassName;
-    }
-    JavaFileObject classFile = filer.createSourceFile(fullyQualified, annotatedClass);
-
-    FieldSpec delegateField = FieldSpec.builder(TypeName.get(annotatedClass.asType()), "delegate", Modifier.PRIVATE, Modifier.FINAL)
+    FieldSpec delegateField = FieldSpec.builder(TypeName.get(targetClass.asType()), "delegate", Modifier.PRIVATE, Modifier.FINAL)
             .build();
     FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", Modifier.PRIVATE, Modifier.FINAL)
             .build();
 
+    // TODO if it's a class all public constructors and super call
     MethodSpec constructor = MethodSpec.constructorBuilder()
             .addModifiers(Modifier.PUBLIC)
-            .addParameter(TypeName.get(annotatedClass.asType()), "delegate")
+            .addParameter(TypeName.get(targetClass.asType()), "delegate")
             .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
             .addStatement("this.delegate = delegate")
             .addStatement("this.aspect = aspect")
             .build();
 
-    // TODO Generated
-    // TODO JavaDoc
-    TypeSpec generatedAspect = TypeSpec.classBuilder(newClassName)
+    Builder proxyClassBilder = TypeSpec.classBuilder(proxyClassName)
+            // TODO always public?
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            .addOriginatingElement(annotatedClass)
+            .addJavadoc("Proxy class for {@link $T} being advised by {@link $T}.\n",
+                    TypeName.get(targetClass.asType()),
+                    TypeName.get(aspectToGenerate.getAspect()))
+            .addOriginatingElement(targetClass)
             .addField(delegateField)
             .addField(aspectField)
-            .addMethod(constructor)
+            .addMethod(constructor);
+
+    if (isSubclassingRequired(targetClass)) {
+      proxyClassBilder.superclass(TypeName.get(targetClass.asType()));
+    } else {
+      for (TypeMirror superinterface : targetClass.getInterfaces()) {
+        proxyClassBilder.addSuperinterface(TypeName.get(superinterface));
+      }
+    }
+
+    if (this.addGenerated) {
+      proxyClassBilder.addAnnotation(AnnotationSpec.builder(ClassName.get("javax.annotation", "Generated"))
+              .addMember("value", "$S", this.getClass().getName())
+              .build());
+    }
+    TypeSpec proxyClass = proxyClassBilder.build();
+
+    JavaFile javaFile = JavaFile.builder(packageName, proxyClass)
             .build();
 
-    JavaFile javaFile = JavaFile.builder(packageName, generatedAspect)
-            .build();
 
-    try (Writer writer = classFile.openWriter()) {
+    Filer filer = this.processingEnv.getFiler();
+    String fullyQualified = getFullyQualifiedProxyClassName(packageName, proxyClassName);
+    JavaFileObject javaFileObject = filer.createSourceFile(fullyQualified, targetClass);
+    try (Writer writer = javaFileObject.openWriter()) {
       javaFile.writeTo(writer);
     }
 
   }
 
-  private String generateClassName(Element originalClass) {
-    String simpleName = getSimpleName(originalClass);
+  private String getFullyQualifiedProxyClassName(String packageName, String proxyClassName) {
+    // FIXME find method
+    if (packageName.isEmpty()) {
+      return proxyClassName;
+    } else {
+      return packageName + "." + proxyClassName;
+    }
+  }
+
+  private String generateClassName(TypeElement targetClass) {
+    String simpleName = getSimpleName(targetClass);
     return this.namingStrategy.deriveClassName(simpleName);
   }
 
-  private String extractAspectClassName(AnnotationMirror applyAspect) {
-    // @ApplyAspect#value()
-    TypeMirror aspectClass = extractAspectClassTypeMirror(applyAspect);
-    // @ApplyAspect#value() = Aspect.class
+  private String extractAspectClassName(AnnotationMirror adviseBy) {
+    // @AdviseBy#value()
+    TypeMirror aspectClass = extractAspectClassTypeMirror(adviseBy);
+    // @AdviseBy#value() = Aspect.class
     DeclaredType declaredType = aspectClass.accept(DeclaredTypeExtractor.INSTANCE, null);
     return getQualifiedName(declaredType.asElement());
   }
 
-  private TypeMirror extractAspectClassTypeMirror(AnnotationMirror applyAspect) {
-    // @ApplyAspect#value()
-    AnnotationValue annotationValue = applyAspect.getElementValues().get(this.applyAspectValueMethod);
+  private TypeMirror extractAspectClassTypeMirror(AnnotationMirror adviseBy) {
+    // @AdviseBy#value()
+    AnnotationValue annotationValue = adviseBy.getElementValues().get(this.adviseByValueMethod);
     return annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
   }
 
@@ -215,8 +261,8 @@ public class Processor extends AbstractProcessor {
     return element.accept(TypeElementExtractor.INSTANCE, null).getQualifiedName().toString();
   }
 
-  private static String getSimpleName(Element element) {
-    return element.accept(TypeElementExtractor.INSTANCE, null).getSimpleName().toString();
+  private static String getSimpleName(TypeElement element) {
+    return element.getSimpleName().toString();
   }
 
   private String getPackageName(Element element) {
@@ -237,8 +283,10 @@ public class Processor extends AbstractProcessor {
     throw new NoSuchElementException("no method named: " + methodName);
   }
 
-  private boolean isSubclassingRequired() {
-    // TODO is interface
+  private boolean isSubclassingRequired(TypeElement typeElement) {
+    if (typeElement.getKind() == ElementKind.INTERFACE) {
+      return false;
+    }
     // javax.lang.model.util.Elements.overrides(ExecutableElement, ExecutableElement, TypeElement)
     return true;
   }
@@ -340,17 +388,17 @@ public class Processor extends AbstractProcessor {
 
     private final String targetClassName;
     private final String aspectClassName;
-    private final Element targetClassElement;
+    private final TypeElement targetClassElement;
     private final TypeMirror aspect;
 
-    ProxyToGenerate(String targetClassName, String apectClassName, Element targetClassElement, TypeMirror aspect) {
+    ProxyToGenerate(String targetClassName, String apectClassName, TypeElement targetClassElement, TypeMirror aspect) {
       this.targetClassName = targetClassName;
       this.aspectClassName = apectClassName;
       this.targetClassElement = targetClassElement;
       this.aspect = aspect;
     }
 
-    Element getTargetClassElement() {
+    TypeElement getTargetClassElement() {
       return this.targetClassElement;
     }
 

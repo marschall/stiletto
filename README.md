@@ -13,3 +13,5 @@ But
 - instantiation where unavoidable
 
 https://docs.spring.io/spring/docs/current/spring-framework-reference/html/aop.html#aop-introduction-defn
+
+http://hannesdorfmann.com/annotation-processing/annotationprocessing101

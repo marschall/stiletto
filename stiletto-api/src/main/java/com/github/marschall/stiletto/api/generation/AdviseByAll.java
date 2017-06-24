@@ -10,11 +10,11 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(SOURCE)
 @Target(TYPE)
-public @interface ApplyAspects {
+public @interface AdviseByAll {
 
   // TODO composite aspect
   // TODO name pattern
 
-  ApplyAspect[] value();
+  AdviseBy[] value();
 
 }
