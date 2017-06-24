@@ -28,6 +28,7 @@ import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
@@ -58,6 +59,8 @@ public class Processor extends AbstractProcessor {
 
   private NamingStrategy namingStrategy;
 
+  private boolean addGenerated;
+
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
@@ -67,6 +70,7 @@ public class Processor extends AbstractProcessor {
     TypeElement generateAspect = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECT);
     this.generateAspectValueMethod = getValueMethod(generateAspect);
     this.namingStrategy = s -> s + "_";
+    this.addGenerated = true;
   }
 
   @Override
@@ -82,38 +86,45 @@ public class Processor extends AbstractProcessor {
     }
   }
 
-  private Set<AspectToGenerate> extractAspectsToGenerate(
-          RoundEnvironment roundEnv) {
+  private Set<AspectToGenerate> extractAspectsToGenerate(RoundEnvironment roundEnv) {
     TypeElement generateAspectsType = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECTS);
-    TypeElement generateAspectType = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECT);
     ExecutableElement generateAspectsValueMethod = getValueMethod(generateAspectsType);
 
+    // handle @GenerateAspects
     Set<AspectToGenerate> toGenerate = new HashSet<>();
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspectsType)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      String processedClassName = getQualifiedName(processedClass);
       for (AnnotationMirror generateAspectsMirror : processedClass.getAnnotationMirrors()) { //@GenerateAspects
         AnnotationValue generateAspectsValue = generateAspectsMirror.getElementValues().get(generateAspectsValueMethod); //@GenerateAspects
         for (AnnotationValue generateAspectValue : generateAspectsValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@GenerateAspect
           AnnotationMirror generateAspectMirror = generateAspectValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@GenerateAspect
-          String aspectClassName = extractAspectClassName(generateAspectMirror);
-          toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(generateAspectMirror)));
+          AspectToGenerate aspectToGenerate = buildAspectToGenerate(processedClass, generateAspectMirror);
+          toGenerate.add(aspectToGenerate);
         }
       }
     }
+
+    // handle @GenerateAspect
+    TypeElement generateAspectType = this.processingEnv.getElementUtils().getTypeElement(GENERATE_ASPECT);
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(generateAspectType)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
       }
-      String processedClassName = getQualifiedName(processedClass);
       for (AnnotationMirror generateAspectMirror : processedClass.getAnnotationMirrors()) { // @GenerateAspect
-        String aspectClassName = extractAspectClassName(generateAspectMirror);
-        toGenerate.add(new AspectToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(generateAspectMirror)));
+        AspectToGenerate aspectToGenerate = buildAspectToGenerate(processedClass, generateAspectMirror);
+        toGenerate.add(aspectToGenerate);
       }
     }
+
     return toGenerate;
+  }
+
+  private AspectToGenerate buildAspectToGenerate(Element processedClass, AnnotationMirror generateAspectMirror) {
+    String processedClassName = getQualifiedName(processedClass);
+    String aspectClassName = extractAspectClassName(generateAspectMirror);
+    return new AspectToGenerate(processedClassName, aspectClassName, processedClass, extractAspectClassTypeMirror(generateAspectMirror));
   }
 
   private boolean validateAnnoatedClass(Element element) {
@@ -141,7 +152,7 @@ public class Processor extends AbstractProcessor {
     String newClassName = generateClassName(annotatedClass);
     String packageName = getPackageName(annotatedClass);
 
-    String fullyQualified;
+    String fullyQualified; // FIXME find method
     if (packageName.isEmpty()) {
       fullyQualified = newClassName;
     } else {
@@ -206,14 +217,9 @@ public class Processor extends AbstractProcessor {
     return element.accept(TypeElementExtractor.INSTANCE, null).getSimpleName().toString();
   }
 
-  private static String getPackageName(Element element) {
-    String qualifiedName = getQualifiedName(element);
-    String simpleName = getSimpleName(element);
-    if (qualifiedName.length() == simpleName.length()) {
-      return "";
-    }
-    // FIXME charsequence#length()
-    return qualifiedName.substring(0, qualifiedName.length() - simpleName.length() - 1);
+  private String getPackageName(Element element) {
+    PackageElement packageElement = this.processingEnv.getElementUtils().getPackageOf(element);
+    return packageElement.getQualifiedName().toString();
   }
 
   private ExecutableElement getValueMethod(TypeElement typeElement) {
@@ -227,6 +233,12 @@ public class Processor extends AbstractProcessor {
       }
     }
     throw new NoSuchElementException("no method named: " + methodName);
+  }
+
+  private boolean isSubclassingRequired() {
+    // TODO is interface
+    // javax.lang.model.util.Elements.overrides(ExecutableElement, ExecutableElement, TypeElement)
+    return true;
   }
 
   static class ExpectedElementExtractor<R> extends SimpleElementVisitor8<R, Void> {
@@ -244,6 +256,17 @@ public class Processor extends AbstractProcessor {
 
     @Override
     public TypeElement visitType(TypeElement e, Void p) {
+      return e;
+    }
+
+  }
+
+  static final class PackageElementExtractor extends ExpectedElementExtractor<PackageElement> {
+
+    static final ElementVisitor<PackageElement, Void> INSTANCE = new PackageElementExtractor();
+
+    @Override
+    public PackageElement visitPackage(PackageElement e, Void p) {
       return e;
     }
 
