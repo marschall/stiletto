@@ -6,11 +6,13 @@ import static javax.lang.model.SourceVersion.RELEASE_8;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -31,6 +33,7 @@ import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
@@ -45,6 +48,7 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
@@ -182,7 +186,7 @@ public class ProxyGenerator extends AbstractProcessor {
     String proxyClassName = generateClassName(targetClass);
     String packageName = getPackageName(targetClass);
 
-    FieldSpec delegateField = FieldSpec.builder(TypeName.get(targetClass.asType()), "delegate", Modifier.PRIVATE, Modifier.FINAL)
+    FieldSpec targetObjectField = FieldSpec.builder(TypeName.get(targetClass.asType()), "targetObject", Modifier.PRIVATE, Modifier.FINAL)
             .build();
     FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", Modifier.PRIVATE, Modifier.FINAL)
             .build();
@@ -191,14 +195,6 @@ public class ProxyGenerator extends AbstractProcessor {
     // TODO do not proxy Cloneable, Seriablizable, Externalizable
     // TODO string?
 
-    // TODO if it's a class all public constructors and super call
-    MethodSpec constructor = MethodSpec.constructorBuilder()
-            .addModifiers(Modifier.PUBLIC)
-            .addParameter(TypeName.get(targetClass.asType()), "delegate")
-            .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
-            .addStatement("this.delegate = delegate")
-            .addStatement("this.aspect = aspect")
-            .build();
 
     Builder proxyClassBilder = TypeSpec.classBuilder(proxyClassName)
             // TODO always public?
@@ -207,9 +203,33 @@ public class ProxyGenerator extends AbstractProcessor {
                     TypeName.get(targetClass.asType()),
                     TypeName.get(aspectToGenerate.getAspect()))
             .addOriginatingElement(targetClass)
-            .addField(delegateField)
-            .addField(aspectField)
-            .addMethod(constructor);
+            .addField(targetObjectField)
+            .addField(aspectField);
+
+    List<ExecutableElement> nonPrivateConstrctors = getNonPrivateConstrctors(targetClass);
+    if (nonPrivateConstrctors.isEmpty()) {
+      proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
+              // TODO keep visibility?
+              .addModifiers(Modifier.PUBLIC)
+              .addParameter(TypeName.get(targetClass.asType()), "targetObject")
+              .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+              .addStatement("this.targetObject = targetObject")
+              .addStatement("this.aspect = aspect")
+              .build());
+    } else {
+      for (ExecutableElement constrctor : nonPrivateConstrctors) {
+        // TODO keep visibility?
+        proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameters(getParameters(constrctor))
+                .addParameter(TypeName.get(targetClass.asType()), "targetObject")
+                .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+                .addStatement(generateSuperCall(constrctor))
+                .addStatement("this.targetObject = targetObject")
+                .addStatement("this.aspect = aspect")
+                .build());
+      }
+    }
 
     if (targetClass.getKind() == ElementKind.INTERFACE) {
       proxyClassBilder.addSuperinterface(TypeName.get(targetClass.asType()));
@@ -255,6 +275,31 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
+  private static Iterable<ParameterSpec> getParameters(ExecutableElement executableElement) {
+    return executableElement.getParameters().stream()
+            .map(ParameterSpec::get)
+            .collect(Collectors.toList());
+  }
+
+  private static String generateSuperCall(ExecutableElement executableElement) {
+    List<? extends VariableElement> parameters = executableElement.getParameters();
+    if (parameters.isEmpty()) {
+      return "super()";
+    }
+    StringBuilder buffer = new StringBuilder();
+    buffer.append("super(");
+    boolean first = true;
+    for (VariableElement parameter : parameters) {
+      if (!first) {
+        buffer.append(", ");
+      }
+      buffer.append(parameter.getSimpleName().toString());
+      first = false;
+    }
+    buffer.append(')');
+    return buffer.toString();
+  }
+
   private String getFullyQualifiedProxyClassName(String packageName, String proxyClassName) {
     // FIXME find method
     if (packageName.isEmpty()) {
@@ -291,6 +336,14 @@ public class ProxyGenerator extends AbstractProcessor {
     return element.getSimpleName().toString();
   }
 
+  private static List<ExecutableElement> getNonPrivateConstrctors(TypeElement element) {
+    List<ExecutableElement> constrctors = new ArrayList<>(2);
+    for (Element member : element.getEnclosedElements()) {
+      member.accept(NonPrivateConstrctorExtractor.INSTANCE, constrctors);
+    }
+    return constrctors;
+  }
+
   private String getPackageName(Element element) {
     PackageElement packageElement = this.processingEnv.getElementUtils().getPackageOf(element);
     return packageElement.getQualifiedName().toString();
@@ -317,7 +370,21 @@ public class ProxyGenerator extends AbstractProcessor {
     return true;
   }
 
-  static class ExpectedElementExtractor<R> extends SimpleElementVisitor8<R, Void> {
+  static final class NonPrivateConstrctorExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
+
+    public static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstrctorExtractor();
+
+    @Override
+    public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
+      if (e.getKind() == ElementKind.CONSTRUCTOR && !e.getModifiers().contains(Modifier.PRIVATE)) {
+        p.add(e);
+      }
+      return null;
+    }
+
+  }
+
+  static abstract class ExpectedElementExtractor<R> extends SimpleElementVisitor8<R, Void> {
 
     @Override
     protected R defaultAction(Element e, Void p) {
@@ -348,7 +415,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  static class ExpectedTypeExtractor<R> extends SimpleTypeVisitor8<R, Void> {
+  static abstract class ExpectedTypeExtractor<R> extends SimpleTypeVisitor8<R, Void> {
 
     @Override
     protected R defaultAction(TypeMirror e, Void p) {
@@ -368,7 +435,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  static class ExpectedValueExtractor<R> extends SimpleAnnotationValueVisitor8<R, Void> {
+  static abstract class ExpectedValueExtractor<R> extends SimpleAnnotationValueVisitor8<R, Void> {
 
     @Override
     protected R defaultAction(Object o, Void p) {
