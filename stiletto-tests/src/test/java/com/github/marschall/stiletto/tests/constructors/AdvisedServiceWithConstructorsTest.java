@@ -2,28 +2,34 @@ package com.github.marschall.stiletto.tests.constructors;
 
 import static org.junit.Assert.assertEquals;
 
-import org.junit.Before;
 import org.junit.Test;
 
 import com.github.marschall.stiletto.tests.BeforeCountingAspect;
 
 public class AdvisedServiceWithConstructorsTest {
 
-  private AdvisedServiceWithConstructors proxy;
-  private BeforeCountingAspect aspect;
+  @Test
+  public void simpleMethodIntConstructor() {
+    int value = 42;
+    AdvisedServiceWithConstructors targetObject = new AdvisedServiceWithConstructors(value);
+    BeforeCountingAspect aspect = new BeforeCountingAspect();
+    AdvisedServiceWithConstructors proxy = new AdvisedServiceWithConstructors_(value, targetObject, aspect);
 
-  @Before
-  public void setUp() {
-    AdvisedServiceWithConstructors targetObject = new AdvisedServiceWithConstructors(42);
-    this.aspect = new BeforeCountingAspect();
-    this.proxy = new AdvisedServiceWithConstructors_(42, targetObject, this.aspect);
+    assertEquals(0, aspect.getInvocationCount());
+    assertEquals(Integer.toString(value), proxy.simpleMethod());
+    assertEquals(1, aspect.getInvocationCount());
   }
 
   @Test
-  public void simpleMethod() {
-    assertEquals(0, this.aspect.getInvocationCount());
-    assertEquals("42", this.proxy.simpleMethod());
-    assertEquals(1, this.aspect.getInvocationCount());
+  public void simpleMethodLongConstructor() {
+    long value = 42;
+    AdvisedServiceWithConstructors targetObject = new AdvisedServiceWithConstructors(value);
+    BeforeCountingAspect aspect = new BeforeCountingAspect();
+    AdvisedServiceWithConstructors proxy = new AdvisedServiceWithConstructors_(value, targetObject, aspect);
+
+    assertEquals(0, aspect.getInvocationCount());
+    assertEquals(Long.toString(value), proxy.simpleMethod());
+    assertEquals(1, aspect.getInvocationCount());
   }
 
 }

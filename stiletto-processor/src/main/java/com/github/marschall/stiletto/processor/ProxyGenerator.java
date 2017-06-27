@@ -33,6 +33,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.PackageElement;
@@ -41,6 +42,7 @@ import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.util.Elements;
@@ -94,8 +96,8 @@ public class ProxyGenerator extends AbstractProcessor {
     this.adviseByValueMethod = getValueMethod(adviseBy);
     this.namingStrategy = s -> s + "_";
     this.addGenerated = true;
-    this.intType = typeUtils.unboxedType(elementUtils.getTypeElement("java.lang.Integer").asType());
-    this.longType = typeUtils.unboxedType(elementUtils.getTypeElement("java.lang.Long").asType());
+    this.intType = typeUtils.getPrimitiveType(TypeKind.INT);
+    this.longType = typeUtils.getPrimitiveType(TypeKind.LONG);
   }
 
   @Override
@@ -185,26 +187,48 @@ public class ProxyGenerator extends AbstractProcessor {
       valid = false;
     }
 
+    // no final non-static methods
     for (Element member : this.processingEnv.getElementUtils().getAllMembers(typeElement)) {
       if (member.getKind() == ElementKind.METHOD) {
         if (member.getModifiers().contains(FINAL) && !member.getModifiers().contains(STATIC)) {
           // ignore final non-static methods from java.lang.Object
           ExecutableElement method = (ExecutableElement) member;
-          if (!isObjectMethod(method)) {
+          if (!isFinalObjectMethod(method)) {
             messager.printMessage(Kind.ERROR, "final methods can not be proxied", typeElement);
             valid = false;
-
           }
         }
       }
     }
 
-    // final non static methods
 
     return valid;
   }
 
+  private List<ExecutableElement> getMethodsToImplement(TypeElement targetClass) {
+    List<ExecutableElement> methods = new ArrayList<>();
+    for (Element member : this.processingEnv.getElementUtils().getAllMembers(targetClass)) {
+      if (member.getKind() == ElementKind.METHOD) {
+        Set<Modifier> modifiers = member.getModifiers();
+        if (!modifiers.contains(FINAL) && !modifiers.contains(STATIC) && !modifiers.contains(PRIVATE)) {
+          // ignore final non-static methods from java.lang.Object
+          ExecutableElement method = (ExecutableElement) member;
+          if (!isObjectMethod(method)) {
+            methods.add(method);
+          }
+        }
+      }
+    }
+    return methods;
+  }
+
   private boolean isObjectMethod(ExecutableElement method) {
+    // FIXME
+    TypeElement object = this.processingEnv.getElementUtils().getTypeElement("java.lang.Object");
+    return this.processingEnv.getElementUtils().getAllMembers(object).contains(method);
+  }
+
+  private boolean isFinalObjectMethod(ExecutableElement method) {
     Name methodName = method.getSimpleName();
     int parameterCount = method.getParameters().size();
     if (methodName.contentEquals("getClass") && parameterCount == 0) {
@@ -273,32 +297,6 @@ public class ProxyGenerator extends AbstractProcessor {
             .addField(targetObjectField)
             .addField(aspectField);
 
-    List<ExecutableElement> nonPrivateConstrctors = getNonPrivateConstrctors(targetClass);
-    if (nonPrivateConstrctors.isEmpty()) {
-      proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
-              // TODO keep visibility?
-              .addModifiers(PUBLIC)
-              .addParameter(TypeName.get(targetClass.asType()), "targetObject")
-              .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
-              .addStatement("this.targetObject = targetObject")
-              .addStatement("this.aspect = aspect")
-              .build());
-    } else {
-      for (ExecutableElement constrctor : nonPrivateConstrctors) {
-        // TODO keep visibility?
-        proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
-                .addModifiers(PUBLIC)
-                .addParameters(getParameters(constrctor))
-                .addParameter(TypeName.get(targetClass.asType()), "targetObject")
-                .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
-                // add super call even for default constructor in oder to aid debugging
-                .addStatement(generateSuperCall(constrctor))
-                .addStatement("this.targetObject = targetObject")
-                .addStatement("this.aspect = aspect")
-                .build());
-      }
-    }
-
     if (targetClass.getKind() == ElementKind.INTERFACE) {
       proxyClassBilder.addSuperinterface(TypeName.get(targetClass.asType()));
       List<? extends TypeParameterElement> typeParameters = targetClass.getTypeParameters();
@@ -328,6 +326,40 @@ public class ProxyGenerator extends AbstractProcessor {
               .addMember("value", "$S", this.getClass().getName())
               .build());
     }
+
+    List<ExecutableElement> nonPrivateConstrctors = getNonPrivateConstrctors(targetClass);
+    if (nonPrivateConstrctors.isEmpty()) {
+      proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
+              // TODO keep visibility?
+              .addModifiers(PUBLIC)
+              .addParameter(TypeName.get(targetClass.asType()), "targetObject")
+              .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+              .addStatement("this.targetObject = targetObject")
+              .addStatement("this.aspect = aspect")
+              .build());
+    } else {
+      for (ExecutableElement constrctor : nonPrivateConstrctors) {
+        // TODO keep visibility?
+        proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
+                .addModifiers(PUBLIC)
+                .addParameters(getParameters(constrctor))
+                .addParameter(TypeName.get(targetClass.asType()), "targetObject")
+                .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+                // add super call even for default constructor in oder to aid debugging
+                .addStatement(generateSuperCall(constrctor))
+                .addStatement("this.targetObject = targetObject")
+                .addStatement("this.aspect = aspect")
+                .build());
+      }
+    }
+
+    for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
+      boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
+      proxyClassBilder.addMethod(MethodSpec.overriding(method)
+              .addStatement((isVoid ? "" : "return ") + buildCall("this.targetObject." + method.getSimpleName(), method))
+              .build());
+    }
+
     TypeSpec proxyClass = proxyClassBilder.build();
 
     JavaFile javaFile = JavaFile.builder(packageName, proxyClass)
@@ -349,13 +381,18 @@ public class ProxyGenerator extends AbstractProcessor {
             .collect(Collectors.toList());
   }
 
-  private static String generateSuperCall(ExecutableElement executableElement) {
-    List<? extends VariableElement> parameters = executableElement.getParameters();
+  private static String generateSuperCall(ExecutableElement constructor) {
+    return buildCall("super", constructor);
+  }
+
+  private static String buildCall(String receiver, ExecutableElement method) {
+    List<? extends VariableElement> parameters = method.getParameters();
     if (parameters.isEmpty()) {
-      return "super()";
+      return receiver + "()";
     }
     StringBuilder buffer = new StringBuilder();
-    buffer.append("super(");
+    buffer.append(receiver);
+    buffer.append('(');
     boolean first = true;
     for (VariableElement parameter : parameters) {
       if (!first) {
