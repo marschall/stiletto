@@ -1,9 +1,8 @@
 package com.github.marschall.stiletto.api.generation;
 
+import static com.github.marschall.stiletto.api.generation.AdviseBy.MethodSelection.ALL_PUBLIC;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
-
-import static com.github.marschall.stiletto.api.generation.AdviseBy.MethodSelection.ALL_PUBLIC;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Repeatable;

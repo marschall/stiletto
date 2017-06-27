@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.marschall</groupId>
@@ -6,7 +7,7 @@
   <version>0.1.0-SNAPSHOT</version>
   <inceptionYear>2017</inceptionYear>
   <name>Stiletto</name>
-  <description>AOP without runtime reflection.</description>
+  <description>an AOP weaver that uses source file generation</description>
   <packaging>pom</packaging>
 
   <url>https://github.com/marschall/stiletto</url>
@@ -17,6 +18,16 @@
     <url>${project.url}</url>
     <tag>HEAD</tag>
   </scm>
+
+  <ciManagement>
+    <system>Travis</system>
+    <url>https://travis-ci.org/marschall/stiletto</url>
+  </ciManagement>
+
+  <issueManagement>
+    <url>https://github.com/marschall/stiletto/issues</url>
+    <system>GitHub Isues</system>
+  </issueManagement>
 
   <modules>
     <module>stiletto-api</module>
@@ -30,13 +41,13 @@
       <id>marschall</id>
       <name>Philippe Marschall</name>
       <email>philippe.marschall@gmail.com</email>
-      <timezone>+1</timezone>
+      <timezone>Europe/Zurich</timezone>
       <roles>
         <role>developer</role>
       </roles>
     </developer>
   </developers>
-  
+
   <licenses>
     <license>
       <name>MIT</name>
@@ -44,7 +55,7 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-  
+
   <distributionManagement>
     <snapshotRepository>
       <id>sonatype-nexus-snapshots</id>
@@ -57,21 +68,21 @@
       <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
     </repository>
   </distributionManagement>
-  
+
   <dependencyManagement>
 
-  <dependencies>
-    <dependency>
-      <groupId>com.squareup</groupId>
-      <artifactId>javapoet</artifactId>
-      <version>1.9.0</version>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.12</version>
-    </dependency>
-  </dependencies>
+    <dependencies>
+      <dependency>
+        <groupId>com.squareup</groupId>
+        <artifactId>javapoet</artifactId>
+        <version>1.9.0</version>
+      </dependency>
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.12</version>
+      </dependency>
+    </dependencies>
   </dependencyManagement>
 
   <build>
@@ -191,7 +202,8 @@
           <artifactId>maven-scm-plugin</artifactId>
           <version>1.9.4</version>
         </plugin>
-        <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself. -->
+        <!--This plugin's configuration is used to store Eclipse m2e settings 
+          only. It has no influence on the Maven build itself. -->
         <plugin>
           <groupId>org.eclipse.m2e</groupId>
           <artifactId>lifecycle-mapping</artifactId>
@@ -219,7 +231,7 @@
       </plugins>
     </pluginManagement>
   </build>
-  
+
   <profiles>
     <profile>
       <id>deploy-to-sonatype-oss</id>

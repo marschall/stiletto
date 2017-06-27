@@ -1,3 +1,8 @@
+An AOP weaver that uses source file generation.
+
+AOP without runtime reflection.
+AOP without runtime bytecode generation.
+
 Declaration of Ideals
 
 No
