@@ -3,6 +3,11 @@ package com.github.marschall.stiletto.processor;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
+import static javax.lang.model.element.Modifier.ABSTRACT;
+import static javax.lang.model.element.Modifier.FINAL;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PUBLIC;
+import static javax.lang.model.element.Modifier.STATIC;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -28,18 +33,21 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
+import javax.lang.model.util.Elements;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.lang.model.util.SimpleElementVisitor8;
 import javax.lang.model.util.SimpleTypeVisitor8;
+import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 
@@ -51,8 +59,8 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.TypeVariableName;
 import com.squareup.javapoet.TypeSpec.Builder;
+import com.squareup.javapoet.TypeVariableName;
 
 @SupportedAnnotationTypes({ADVISE_BY, ADVISE_BY_ALL})
 @SupportedSourceVersion(RELEASE_8)
@@ -66,20 +74,28 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private ExecutableElement adviseByValueMethod;
 
+  // TODO el?
   private NamingStrategy namingStrategy;
 
   private boolean addGenerated;
+
+  private PrimitiveType intType;
+
+  private PrimitiveType longType;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
     this.processingEnv = processingEnv;
 
-
-    TypeElement adviseBy = this.processingEnv.getElementUtils().getTypeElement(ADVISE_BY);
+    Elements elementUtils = this.processingEnv.getElementUtils();
+    Types typeUtils = this.processingEnv.getTypeUtils();
+    TypeElement adviseBy = elementUtils.getTypeElement(ADVISE_BY);
     this.adviseByValueMethod = getValueMethod(adviseBy);
     this.namingStrategy = s -> s + "_";
     this.addGenerated = true;
+    this.intType = typeUtils.unboxedType(elementUtils.getTypeElement("java.lang.Integer").asType());
+    this.longType = typeUtils.unboxedType(elementUtils.getTypeElement("java.lang.Long").asType());
   }
 
   @Override
@@ -157,7 +173,7 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     if (isClass) {
-      boolean isAbstract = typeElement.getModifiers().contains(Modifier.ABSTRACT);
+      boolean isAbstract = typeElement.getModifiers().contains(ABSTRACT);
       if (isAbstract) {
         messager.printMessage(Kind.ERROR, "advising abstract classes is not supported", typeElement);
         valid = false;
@@ -169,7 +185,58 @@ public class ProxyGenerator extends AbstractProcessor {
       valid = false;
     }
 
+    for (Element member : this.processingEnv.getElementUtils().getAllMembers(typeElement)) {
+      if (member.getKind() == ElementKind.METHOD) {
+        if (member.getModifiers().contains(FINAL) && !member.getModifiers().contains(STATIC)) {
+          // ignore final non-static methods from java.lang.Object
+          ExecutableElement method = (ExecutableElement) member;
+          if (!isObjectMethod(method)) {
+            messager.printMessage(Kind.ERROR, "final methods can not be proxied", typeElement);
+            valid = false;
+
+          }
+        }
+      }
+    }
+
+    // final non static methods
+
     return valid;
+  }
+
+  private boolean isObjectMethod(ExecutableElement method) {
+    Name methodName = method.getSimpleName();
+    int parameterCount = method.getParameters().size();
+    if (methodName.contentEquals("getClass") && parameterCount == 0) {
+      // java.lang.Object.getClass()
+      return true;
+    }
+    if (methodName.contentEquals("notify") && parameterCount == 0) {
+      // java.lang.Object.notify()
+      return true;
+    }
+    if (methodName.contentEquals("notifyAll") && parameterCount == 0) {
+      // java.lang.Object.notifyAll()
+      return true;
+    }
+    if (methodName.contentEquals("wait")) {
+      if (parameterCount == 0) {
+        // java.lang.Object.wait()
+        return true;
+      } else if (parameterCount == 1) {
+        if (method.getParameters().get(0).asType().equals(this.longType)) {
+          // java.lang.Object.wait(long)
+          return true;
+        }
+      } else if (parameterCount == 2) {
+        if (method.getParameters().get(0).asType().equals(this.longType)
+                && method.getParameters().get(1).asType().equals(this.intType)) {
+          // java.lang.Object.wait(long, int)
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private void generateProxyProtected(ProxyToGenerate proxyToGenerate) {
@@ -186,19 +253,19 @@ public class ProxyGenerator extends AbstractProcessor {
     String proxyClassName = generateClassName(targetClass);
     String packageName = getPackageName(targetClass);
 
-    FieldSpec targetObjectField = FieldSpec.builder(TypeName.get(targetClass.asType()), "targetObject", Modifier.PRIVATE, Modifier.FINAL)
+    FieldSpec targetObjectField = FieldSpec.builder(TypeName.get(targetClass.asType()), "targetObject", PRIVATE, FINAL)
             .build();
-    FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", Modifier.PRIVATE, Modifier.FINAL)
+    FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", PRIVATE, FINAL)
             .build();
 
     // TODO do not proxy equals and hashCode
-    // TODO do not proxy Cloneable, Seriablizable, Externalizable
-    // TODO string?
-
+    // TODO do not proxy finalize
+    // TODO do not proxy Cloneable, Serializable, Externalizable, Comparable
+    // TODO toString?
 
     Builder proxyClassBilder = TypeSpec.classBuilder(proxyClassName)
             // TODO always public?
-            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addModifiers(PUBLIC, FINAL)
             .addJavadoc("Proxy class for {@link $T} being advised by {@link $T}.\n",
                     TypeName.get(targetClass.asType()),
                     TypeName.get(aspectToGenerate.getAspect()))
@@ -210,7 +277,7 @@ public class ProxyGenerator extends AbstractProcessor {
     if (nonPrivateConstrctors.isEmpty()) {
       proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
               // TODO keep visibility?
-              .addModifiers(Modifier.PUBLIC)
+              .addModifiers(PUBLIC)
               .addParameter(TypeName.get(targetClass.asType()), "targetObject")
               .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
               .addStatement("this.targetObject = targetObject")
@@ -220,10 +287,11 @@ public class ProxyGenerator extends AbstractProcessor {
       for (ExecutableElement constrctor : nonPrivateConstrctors) {
         // TODO keep visibility?
         proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(PUBLIC)
                 .addParameters(getParameters(constrctor))
                 .addParameter(TypeName.get(targetClass.asType()), "targetObject")
                 .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+                // add super call even for default constructor in oder to aid debugging
                 .addStatement(generateSuperCall(constrctor))
                 .addStatement("this.targetObject = targetObject")
                 .addStatement("this.aspect = aspect")
@@ -339,7 +407,15 @@ public class ProxyGenerator extends AbstractProcessor {
   private static List<ExecutableElement> getNonPrivateConstrctors(TypeElement element) {
     List<ExecutableElement> constrctors = new ArrayList<>(2);
     for (Element member : element.getEnclosedElements()) {
-      member.accept(NonPrivateConstrctorExtractor.INSTANCE, constrctors);
+      member.accept(NonPrivateConstructorExtractor.INSTANCE, constrctors);
+    }
+    return constrctors;
+  }
+
+  private List<ExecutableElement> getOverridableMethods(TypeElement element) {
+    List<ExecutableElement> constrctors = new ArrayList<>();
+    for (Element member : this.processingEnv.getElementUtils().getAllMembers(element)) {
+      member.accept(OverridableMethodExtractor.INSTANCE, constrctors);
     }
     return constrctors;
   }
@@ -370,13 +446,31 @@ public class ProxyGenerator extends AbstractProcessor {
     return true;
   }
 
-  static final class NonPrivateConstrctorExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
+  static final class NonPrivateConstructorExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
 
-    public static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstrctorExtractor();
+    public static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstructorExtractor();
 
     @Override
     public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
-      if (e.getKind() == ElementKind.CONSTRUCTOR && !e.getModifiers().contains(Modifier.PRIVATE)) {
+      if (e.getKind() == ElementKind.CONSTRUCTOR
+              && !e.getModifiers().contains(PRIVATE)) {
+        p.add(e);
+      }
+      return null;
+    }
+
+  }
+
+  static final class OverridableMethodExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
+
+    public static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new OverridableMethodExtractor();
+
+    @Override
+    public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
+      if (e.getKind() == ElementKind.METHOD
+              && !e.getModifiers().contains(PRIVATE)
+              && !e.getModifiers().contains(STATIC)
+              && !e.getModifiers().contains(FINAL)) {
         p.add(e);
       }
       return null;
@@ -519,7 +613,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
     @Override
     public String toString() {
-      return "aspect: " + this.aspectClassName + " -> " + this.targetClassName;
+      return "aspect: " + this.aspectClassName + " -> target class:" + this.targetClassName;
     }
 
   }
