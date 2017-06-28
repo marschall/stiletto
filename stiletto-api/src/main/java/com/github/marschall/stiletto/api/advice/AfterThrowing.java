@@ -12,5 +12,6 @@ import java.lang.annotation.Target;
 @Target(METHOD)
 public @interface AfterThrowing {
 
-    Class<? extends Throwable>[] values();
+  // TODO default Exception?
+  Class<? extends Throwable>[] values() default Throwable.class;
 }

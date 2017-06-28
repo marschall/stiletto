@@ -7,6 +7,13 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+/**
+ * Advice to be executed after a join point (method) returns without
+ * throwing an exception.
+ * <p>
+ * If a method annotated with this has a return value then this is used
+ * as the return value of the method.
+ */
 @Documented
 @Retention(RUNTIME)
 @Target(METHOD)

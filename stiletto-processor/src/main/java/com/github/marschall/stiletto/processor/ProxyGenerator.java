@@ -211,8 +211,8 @@ public class ProxyGenerator extends AbstractProcessor {
       if (member.getKind() == ElementKind.METHOD) {
         Set<Modifier> modifiers = member.getModifiers();
         if (!modifiers.contains(FINAL) && !modifiers.contains(STATIC) && !modifiers.contains(PRIVATE)) {
-          // ignore final non-static methods from java.lang.Object
           ExecutableElement method = (ExecutableElement) member;
+          // ignore methods from java.lang.Object like toString and hashCode
           if (!isObjectMethod(method)) {
             methods.add(method);
           }
@@ -220,6 +220,15 @@ public class ProxyGenerator extends AbstractProcessor {
       }
     }
     return methods;
+  }
+
+
+  private List<ExecutableElement> getOverridableMethods(TypeElement element) {
+    List<ExecutableElement> constrctors = new ArrayList<>();
+    for (Element member : this.processingEnv.getElementUtils().getAllMembers(element)) {
+      member.accept(OverridableMethodExtractor.INSTANCE, constrctors);
+    }
+    return constrctors;
   }
 
   private boolean isObjectMethod(ExecutableElement method) {
@@ -449,13 +458,6 @@ public class ProxyGenerator extends AbstractProcessor {
     return constrctors;
   }
 
-  private List<ExecutableElement> getOverridableMethods(TypeElement element) {
-    List<ExecutableElement> constrctors = new ArrayList<>();
-    for (Element member : this.processingEnv.getElementUtils().getAllMembers(element)) {
-      member.accept(OverridableMethodExtractor.INSTANCE, constrctors);
-    }
-    return constrctors;
-  }
 
   private String getPackageName(Element element) {
     PackageElement packageElement = this.processingEnv.getElementUtils().getPackageOf(element);
@@ -504,11 +506,13 @@ public class ProxyGenerator extends AbstractProcessor {
 
     @Override
     public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
-      if (e.getKind() == ElementKind.METHOD
-              && !e.getModifiers().contains(PRIVATE)
-              && !e.getModifiers().contains(STATIC)
-              && !e.getModifiers().contains(FINAL)) {
-        p.add(e);
+      Set<Modifier> modifiers = e.getModifiers();
+      if (e.getKind() == ElementKind.METHOD) {
+        if (!modifiers.contains(PRIVATE)
+                && !modifiers.contains(STATIC)
+                && !modifiers.contains(FINAL)) {
+          p.add(e);
+        }
       }
       return null;
     }
