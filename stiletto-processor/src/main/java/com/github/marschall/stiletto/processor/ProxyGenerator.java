@@ -72,6 +72,16 @@ public class ProxyGenerator extends AbstractProcessor {
 
   static final String ADVISE_BY = "com.github.marschall.stiletto.api.generation.AdviseBy";
 
+  static final String BEFORE = "com.github.marschall.stiletto.api.advice.Before";
+
+  static final String AROUND = "com.github.marschall.stiletto.api.advice.Around";
+
+  static final String AFTER_THROWING = "com.github.marschall.stiletto.api.advice.AfterThrowing";
+
+  static final String AFTER_RETURNING = "com.github.marschall.stiletto.api.advice.AfterReturning";
+
+  static final String AFTER_FINALLY = "com.github.marschall.stiletto.api.advice.AfterFinally";
+
   private ProcessingEnvironment processingEnv;
 
   private ExecutableElement adviseByValueMethod;
@@ -85,6 +95,16 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private PrimitiveType longType;
 
+  private TypeElement before;
+
+  private TypeElement around;
+
+  private TypeElement afterThrowing;
+
+  private TypeElement afterReturning;
+
+  private TypeElement afterFinally;
+
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
@@ -93,6 +113,11 @@ public class ProxyGenerator extends AbstractProcessor {
     Elements elementUtils = this.processingEnv.getElementUtils();
     Types typeUtils = this.processingEnv.getTypeUtils();
     TypeElement adviseBy = elementUtils.getTypeElement(ADVISE_BY);
+    this.before = elementUtils.getTypeElement(BEFORE);
+    this.around = elementUtils.getTypeElement(AROUND);
+    this.afterThrowing = elementUtils.getTypeElement(AFTER_THROWING);
+    this.afterReturning = elementUtils.getTypeElement(AFTER_RETURNING);
+    this.afterFinally = elementUtils.getTypeElement(AFTER_FINALLY);
     this.adviseByValueMethod = getValueMethod(adviseBy);
     this.namingStrategy = s -> s + "_";
     this.addGenerated = true;
@@ -205,6 +230,27 @@ public class ProxyGenerator extends AbstractProcessor {
     return valid;
   }
 
+
+
+  private List<ExecutableElement> getBeforeMethods(TypeElement aspect) {
+    return getMethodsAnnotatedWith(aspect, this.before);
+  }
+
+  private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement aspect, TypeElement annotation) {
+    TypeMirror annotationType = annotation.asType();
+    List<ExecutableElement> methods = new ArrayList<>();
+    for (Element member : this.processingEnv.getElementUtils().getAllMembers(aspect)) {
+      if (member.getKind() == ElementKind.METHOD) {
+        for (AnnotationMirror mirror : member.getAnnotationMirrors()) {
+          if (mirror.getAnnotationType().equals(annotationType)) {
+            methods.add((ExecutableElement) member);
+          }
+        }
+      }
+    }
+    return methods;
+  }
+
   private List<ExecutableElement> getMethodsToImplement(TypeElement targetClass) {
     List<ExecutableElement> methods = new ArrayList<>();
     for (Element member : this.processingEnv.getElementUtils().getAllMembers(targetClass)) {
@@ -221,7 +267,6 @@ public class ProxyGenerator extends AbstractProcessor {
     }
     return methods;
   }
-
 
   private List<ExecutableElement> getOverridableMethods(TypeElement element) {
     List<ExecutableElement> constrctors = new ArrayList<>();

@@ -19,4 +19,8 @@ But
 
 https://docs.spring.io/spring/docs/current/spring-framework-reference/html/aop.html#aop-introduction-defn
 
+https://ptrthomas.wordpress.com/2006/06/06/java-call-stack-from-http-upto-jdbc-as-a-picture/
+https://ptrthomas.files.wordpress.com/2006/06/jtrac-callstack.pdf
+https://dzone.com/articles/filtering-stack-trace-hell
+
 http://hannesdorfmann.com/annotation-processing/annotationprocessing101

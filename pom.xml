@@ -26,7 +26,7 @@
 
   <issueManagement>
     <url>https://github.com/marschall/stiletto/issues</url>
-    <system>GitHub Isues</system>
+    <system>GitHub Issues</system>
   </issueManagement>
 
   <modules>
@@ -34,6 +34,7 @@
     <module>stiletto-processor</module>
     <module>stiletto-demo</module>
     <module>stiletto-tests</module>
+    <module>stiletto-spring</module>
   </modules>
 
   <developers>
@@ -76,6 +77,13 @@
         <groupId>com.squareup</groupId>
         <artifactId>javapoet</artifactId>
         <version>1.9.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-framework-bom</artifactId>
+        <version>4.3.9.RELEASE</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>junit</groupId>
@@ -151,7 +159,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.3</version>
+          <version>3.6.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-resources-plugin</artifactId>
