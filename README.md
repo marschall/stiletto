@@ -24,3 +24,16 @@ https://ptrthomas.files.wordpress.com/2006/06/jtrac-callstack.pdf
 https://dzone.com/articles/filtering-stack-trace-hell
 
 http://hannesdorfmann.com/annotation-processing/annotationprocessing101
+
+Downsides of Spring AOP
+- harder to read stack traces
+- harder to debug code (step into)
+
+Performance Downsides of Spring AOP
+- more allocation
+-- increased allocation pressure
+-- more frequent garbage collection
+- more stack usage
+-- need for bigger stacks
+-- increased root set scanning times
+- code unlikely to inline -> key HotSpot optimization, gateway to other optimizations
