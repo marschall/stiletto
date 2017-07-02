@@ -37,3 +37,9 @@ Performance Downsides of Spring AOP
 -- need for bigger stacks
 -- increased root set scanning times
 - code unlikely to inline -> key HotSpot optimization, gateway to other optimizations
+
+
+events
+https://spring.io/blog/2015/02/11/better-application-events-in-spring-framework-4-2
+
+org.springframework.dao.support.PersistenceExceptionTranslationInterceptor
