@@ -21,6 +21,7 @@ public class ExpressionEvaluator {
 
   public String evaluate(String expression, TargetClass targetClass, JoinPoint joinPoint) {
     // http://illegalargumentexception.blogspot.ch/2008/04/java-using-el-outside-j2ee.html
+    // https://docs.oracle.com/javaee/7/api/javax/el/ELProcessor.html
 
     ExpressionFactory expressionFactory = ExpressionFactory.newInstance();
 

@@ -460,7 +460,20 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private static String buildAspectCall(ExecutableElement method) {
-    return "this.aspect." + method.getSimpleName() + "()";
+    StringBuilder buffer = new StringBuilder();
+    buffer.append("this.aspect.");
+    buffer.append(method.getSimpleName());
+    buffer.append('(');
+    boolean first = true;
+    for (VariableElement parameter: method.getParameters()) {
+      if (!first) {
+        buffer.append(", ");
+      }
+      first = false;
+      parameter.get
+    }
+    buffer.append(')');
+    return buffer.toString();
   }
 
   private static String generateSuperCall(ExecutableElement constructor) {
