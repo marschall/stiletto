@@ -7,13 +7,13 @@ import com.github.marschall.stiletto.api.injection.Evaluate;
 public class LoggingAspect {
 
   @Before
-  public void logEntering(@Evaluate("${joinpoint.methodName}") String methodName) {
-    System.out.println("entering " + methodName);
+  public void logEntering(@Evaluate("entering ${targetClass.fullyQualifiedName}.${joinpoint.methodSignature}") String logMessage) {
+    System.out.println(logMessage);
   }
 
   @AfterReturning
-  public void logExiting(@Evaluate("${joinpoint.methodName}") String methodName) {
-    System.out.println("exiting " + methodName);
+  public void logExiting(@Evaluate("exiting ${targetClass.fullyQualifiedName}.${joinpoint.methodSignature}") String logMessage) {
+    System.out.println(logMessage);
   }
 
 }
