@@ -20,10 +20,14 @@ public class ExpressionEvaluatorTest {
   @Test
   public void eval() {
     TargetClass targetClass = new TargetClass("java.lang.Object");
-    JoinPoint joinPoint = new JoinPoint("toString");
-    assertEquals("java.lang.Object.toString", expressionEvaluator.evaluate("${targetClass.name}.${joinpoint.methodName}", targetClass, joinPoint));
+    JoinPoint joinPoint = new JoinPoint("equals", "equals(Object)");
+    assertEquals("java.lang.Object.equals", expressionEvaluator.evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}", targetClass, joinPoint));
 
-    assertEquals("Object.toString", expressionEvaluator.evaluate("${targetClass.simpleName}.${joinpoint.methodName}", targetClass, joinPoint));
+    assertEquals("Object.equals", expressionEvaluator.evaluate("${targetClass.simpleName}.${joinpoint.methodName}", targetClass, joinPoint));
+
+    assertEquals("Object.equals(Object)", expressionEvaluator.evaluate("${targetClass.simpleName}.${joinpoint.methodSignature}", targetClass, joinPoint));
+
+    assertEquals("entering java.lang.Object.equals", expressionEvaluator.evaluate("entering ${targetClass.fullyQualifiedName}.${joinpoint.methodName}", targetClass, joinPoint));
   }
 
 }

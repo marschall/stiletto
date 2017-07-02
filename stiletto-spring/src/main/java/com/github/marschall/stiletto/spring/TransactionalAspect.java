@@ -33,7 +33,7 @@ public class TransactionalAspect {
 
   @Around
   public void invoke(@DeclaredAnnotation Transactional transactional,
-          @Evaluate("${targetClass.name}.${joinpoint.methodName}") String joinpointIdentification,
+          @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
           @MethodCall ActualMethodCallWithoutResult call) {
 
     TransactionDefinition definition = new TransactionalTransactionDefinition(transactional, joinpointIdentification);

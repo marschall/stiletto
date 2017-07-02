@@ -21,7 +21,7 @@ public class TargetClassTest {
 
   @Test
   public void getName() {
-    assertEquals("java.lang.Object", this.targetClass.getName());
+    assertEquals("java.lang.Object", this.targetClass.getFullyQualifiedName());
   }
 
   @Test
