@@ -14,6 +14,14 @@ import com.github.marschall.stiletto.api.invocation.ActualMethodCallWithoutResul
 
 /**
  * Reimplementation of {@link org.springframework.transaction.interceptor.TransactionInterceptor}.
+ *
+ * <h2>Not supported</h2>
+ * <ul>
+ *  <li>Dynamic lookup of transaction manager using
+ *  {@link org.springframework.transaction.annotation.Transactional.transactionManager()}.</li>
+ *  <li><a href="https://docs.spring.io/spring/docs/current/spring-framework-reference/htmlsingle/#beans-meta-annotations">
+ *  Meta annotations including {@link org.springframework.core.annotation.AliasFor}.</li>
+ * </ul>
  */
 public class TransactionalAspect {
 
