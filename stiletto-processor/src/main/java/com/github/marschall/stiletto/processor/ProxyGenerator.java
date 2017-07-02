@@ -388,7 +388,9 @@ public class ProxyGenerator extends AbstractProcessor {
               .addModifiers(PUBLIC)
               .addParameter(TypeName.get(targetClass.asType()), "targetObject")
               .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+              .addStatement("$T.requireNonNull(targetObject, $S)", Objects.class, "targetObject")
               .addStatement("this.targetObject = targetObject")
+              .addStatement("$T.requireNonNull(aspect, $S)", Objects.class, "aspect")
               .addStatement("this.aspect = aspect")
               .build());
     } else {
@@ -401,7 +403,9 @@ public class ProxyGenerator extends AbstractProcessor {
                 .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
                 // add super call even for default constructor in oder to aid debugging
                 .addStatement(generateSuperCall(constrctor))
+                .addStatement("$T.requireNonNull(targetObject, $S)", Objects.class, "targetObject")
                 .addStatement("this.targetObject = targetObject")
+                .addStatement("$T.requireNonNull(aspect, $S)", Objects.class, "aspect")
                 .addStatement("this.aspect = aspect")
                 .build());
       }
