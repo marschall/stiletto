@@ -17,7 +17,7 @@ public class AdvisedNonGenericServiceTest {
   }
 
   @Test
-  public void test() {
+  public void genericMethod() {
 
     AdvisedNonGenericService targetObject = new AdvisedNonGenericService();
 

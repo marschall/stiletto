@@ -15,7 +15,7 @@ public class BeforeAdvisedInterfaceTest {
   }
 
   @Test
-  public void test() {
+  public void before() {
 
     BeforeAdvisedInterface targetObject = () ->  {
       assertEquals(1, this.aspect.getInvocationCount());

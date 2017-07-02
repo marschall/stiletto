@@ -17,7 +17,7 @@ public class AdvisedGenericInterfaceTest {
   }
 
   @Test
-  public void test() {
+  public void genericMethod() {
 
     AdvisedGenericInterface<String> targetObject = () ->  {
       assertEquals(1, this.aspect.getInvocationCount());
