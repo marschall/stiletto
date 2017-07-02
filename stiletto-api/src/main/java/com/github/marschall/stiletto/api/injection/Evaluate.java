@@ -12,6 +12,10 @@ import java.lang.annotation.Target;
 @Target(PARAMETER)
 public @interface Evaluate {
 
+  // ${targetClass.name}
+  // ${targetClass.simpleName}
+  // ${joinpoint.methodName}
+
   String value();
 
 }

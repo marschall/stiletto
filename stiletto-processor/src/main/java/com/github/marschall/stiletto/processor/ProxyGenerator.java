@@ -12,6 +12,7 @@ import static javax.lang.model.element.Modifier.STATIC;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -81,6 +82,8 @@ public class ProxyGenerator extends AbstractProcessor {
   static final String AFTER_RETURNING = "com.github.marschall.stiletto.api.advice.AfterReturning";
 
   static final String AFTER_FINALLY = "com.github.marschall.stiletto.api.advice.AfterFinally";
+
+  private static final Set<Modifier> NON_OVERRIDABLE = EnumSet.of(PRIVATE, STATIC, FINAL);
 
   private ProcessingEnvironment processingEnv;
 
@@ -215,7 +218,8 @@ public class ProxyGenerator extends AbstractProcessor {
     // no final non-static methods
     for (Element member : this.processingEnv.getElementUtils().getAllMembers(typeElement)) {
       if (member.getKind() == ElementKind.METHOD) {
-        if (member.getModifiers().contains(FINAL) && !member.getModifiers().contains(STATIC)) {
+        Set<Modifier> modifiers = member.getModifiers();
+        if (modifiers.contains(FINAL) && !modifiers.contains(STATIC)) {
           // ignore final non-static methods from java.lang.Object
           ExecutableElement method = (ExecutableElement) member;
           if (!isFinalObjectMethod(method)) {
@@ -230,10 +234,20 @@ public class ProxyGenerator extends AbstractProcessor {
     return valid;
   }
 
-
-
   private List<ExecutableElement> getBeforeMethods(TypeElement aspect) {
     return getMethodsAnnotatedWith(aspect, this.before);
+  }
+
+  private List<ExecutableElement> getAfterReturningMethods(TypeElement aspect) {
+    return getMethodsAnnotatedWith(aspect, this.afterReturning);
+  }
+
+  private List<ExecutableElement> getAfterFinallyMethods(TypeElement aspect) {
+    return getMethodsAnnotatedWith(aspect, this.afterFinally);
+  }
+
+  private List<ExecutableElement> getAfterThrowingMethods(TypeElement aspect) {
+    return getMethodsAnnotatedWith(aspect, this.afterThrowing);
   }
 
   private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement aspect, TypeElement annotation) {
@@ -251,29 +265,25 @@ public class ProxyGenerator extends AbstractProcessor {
     return methods;
   }
 
+  private static boolean isOverriable(Element method) {
+    return !containsAny(method.getModifiers(), NON_OVERRIDABLE);
+  }
+
+  private static <T> boolean containsAny(Set<T> set, Set<?> elements) {
+    for (Object element : elements) {
+      if (set.contains(element)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private List<ExecutableElement> getMethodsToImplement(TypeElement targetClass) {
     List<ExecutableElement> methods = new ArrayList<>();
     for (Element member : this.processingEnv.getElementUtils().getAllMembers(targetClass)) {
-      if (member.getKind() == ElementKind.METHOD) {
-        Set<Modifier> modifiers = member.getModifiers();
-        if (!modifiers.contains(FINAL) && !modifiers.contains(STATIC) && !modifiers.contains(PRIVATE)) {
-          ExecutableElement method = (ExecutableElement) member;
-          // ignore methods from java.lang.Object like toString and hashCode
-          if (!isObjectMethod(method)) {
-            methods.add(method);
-          }
-        }
-      }
+      member.accept(new ImplementableMethodExtractor(), methods);
     }
     return methods;
-  }
-
-  private List<ExecutableElement> getOverridableMethods(TypeElement element) {
-    List<ExecutableElement> constrctors = new ArrayList<>();
-    for (Element member : this.processingEnv.getElementUtils().getAllMembers(element)) {
-      member.accept(OverridableMethodExtractor.INSTANCE, constrctors);
-    }
-    return constrctors;
   }
 
   private boolean isObjectMethod(ExecutableElement method) {
@@ -384,6 +394,7 @@ public class ProxyGenerator extends AbstractProcessor {
     List<ExecutableElement> nonPrivateConstrctors = getNonPrivateConstrctors(targetClass);
     if (nonPrivateConstrctors.isEmpty()) {
       proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
+              // TODO javadoc
               // TODO keep visibility?
               .addModifiers(PUBLIC)
               .addParameter(TypeName.get(targetClass.asType()), "targetObject")
@@ -395,6 +406,7 @@ public class ProxyGenerator extends AbstractProcessor {
               .build());
     } else {
       for (ExecutableElement constrctor : nonPrivateConstrctors) {
+        // TODO javadoc
         // TODO keep visibility?
         proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(PUBLIC)
@@ -413,9 +425,17 @@ public class ProxyGenerator extends AbstractProcessor {
 
     for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
       boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
-      proxyClassBilder.addMethod(MethodSpec.overriding(method)
-              .addStatement((isVoid ? "" : "return ") + buildCall("this.targetObject." + method.getSimpleName(), method))
-              .build());
+
+      com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
+      // TODO
+      List<ExecutableElement> beforeMethods = getBeforeMethods((TypeElement) this.processingEnv.getTypeUtils().asElement(aspectToGenerate.getAspect()));
+      for (ExecutableElement beforeMethod : beforeMethods) {
+        methodBuilder.addStatement(buildAspectCall(beforeMethod));
+      }
+
+      methodBuilder.addStatement((isVoid ? "" : "return ") + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
+
+      proxyClassBilder.addMethod(methodBuilder.build());
     }
 
     TypeSpec proxyClass = proxyClassBilder.build();
@@ -439,11 +459,15 @@ public class ProxyGenerator extends AbstractProcessor {
             .collect(Collectors.toList());
   }
 
-  private static String generateSuperCall(ExecutableElement constructor) {
-    return buildCall("super", constructor);
+  private static String buildAspectCall(ExecutableElement method) {
+    return "this.aspect." + method.getSimpleName() + "()";
   }
 
-  private static String buildCall(String receiver, ExecutableElement method) {
+  private static String generateSuperCall(ExecutableElement constructor) {
+    return buildDelegateCall("super", constructor);
+  }
+
+  private static String buildDelegateCall(String receiver, ExecutableElement method) {
     List<? extends VariableElement> parameters = method.getParameters();
     if (parameters.isEmpty()) {
       return receiver + "()";
@@ -536,7 +560,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   static final class NonPrivateConstructorExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
 
-    public static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstructorExtractor();
+    static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstructorExtractor();
 
     @Override
     public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
@@ -549,19 +573,12 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  static final class OverridableMethodExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
-
-    public static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new OverridableMethodExtractor();
+  final class ImplementableMethodExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
 
     @Override
     public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
-      Set<Modifier> modifiers = e.getModifiers();
-      if (e.getKind() == ElementKind.METHOD) {
-        if (!modifiers.contains(PRIVATE)
-                && !modifiers.contains(STATIC)
-                && !modifiers.contains(FINAL)) {
-          p.add(e);
-        }
+      if (e.getKind() == ElementKind.METHOD && isOverriable(e) && !isObjectMethod(e)) {
+        p.add(e);
       }
       return null;
     }
