@@ -23,7 +23,8 @@ import java.lang.annotation.Target;
  *  <dt><code>${joinpoint.methodName}</code></dt>
  *  <dd>The name of the join point method.</dd>
  *  <dt><code>${joinpoint.methodSignature}</code></dt>
- *  <dd>The signature of the join point method, includes the name of the method as well as the parameter types.</dd>
+ *  <dd>The <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/methods.html">signature</a>
+ *  of the join point method, includes the name of the method as well as the parameter types.</dd>
  * </dl>
  *
  * <h2>Examples</h2>
