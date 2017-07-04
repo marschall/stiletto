@@ -1,5 +1,12 @@
 package com.github.marschall.stiletto.processor;
 
+import static com.github.marschall.stiletto.processor.AptUtils.asAnnotationMirror;
+import static com.github.marschall.stiletto.processor.AptUtils.asAnnotationValues;
+import static com.github.marschall.stiletto.processor.AptUtils.asDeclaredType;
+import static com.github.marschall.stiletto.processor.AptUtils.asTypeElement;
+import static com.github.marschall.stiletto.processor.AptUtils.asTypeMirror;
+import static com.github.marschall.stiletto.processor.AptUtils.getQualifiedName;
+import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
@@ -29,7 +36,6 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
-import javax.lang.model.element.AnnotationValueVisitor;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ElementVisitor;
@@ -45,11 +51,8 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.util.Elements;
-import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.lang.model.util.SimpleElementVisitor8;
-import javax.lang.model.util.SimpleTypeVisitor8;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
@@ -154,8 +157,8 @@ public class ProxyGenerator extends AbstractProcessor {
       for (AnnotationMirror annotationMirror : processedClass.getAnnotationMirrors()) {
         if (annotationMirror.getAnnotationType().equals(adviseByAllType.asType())) { //@AdviseByAll
           AnnotationValue adviseByAllValue = annotationMirror.getElementValues().get(adviseByAllValueMethod); //@AdviseByAll
-          for (AnnotationValue adviseByValue : adviseByAllValue.accept(AnnotationsMirrorExtractor.INSTANCE, null)) { //@AdviseBy
-            AnnotationMirror adviseByMirror = adviseByValue.accept(AnnotationMirrorExtractor.INSTANCE, null); //@AdviseBy
+          for (AnnotationValue adviseByValue : asAnnotationValues(adviseByAllValue)) { //@AdviseBy
+            AnnotationMirror adviseByMirror = asAnnotationMirror(adviseByValue); //@AdviseBy
             ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, adviseByMirror);
             toGenerate.add(proxyToGenerate);
           }
@@ -183,12 +186,12 @@ public class ProxyGenerator extends AbstractProcessor {
   private ProxyToGenerate buildProxyToGenerate(Element processedClass, AnnotationMirror adviseByMirror) {
     String processedClassName = getQualifiedName(processedClass);
     String aspectClassName = extractAspectClassName(adviseByMirror);
-    TypeElement typeElement = processedClass.accept(TypeElementExtractor.INSTANCE, null);
+    TypeElement typeElement = asTypeElement(processedClass);
     return new ProxyToGenerate(processedClassName, aspectClassName, typeElement, extractAspectClassTypeMirror(adviseByMirror));
   }
 
   private boolean validateAnnoatedClass(Element element) {
-    TypeElement typeElement = element.accept(TypeElementExtractor.INSTANCE, null);
+    TypeElement typeElement = asTypeElement(element);
     boolean isClass = typeElement.getKind() == ElementKind.CLASS;
     boolean isEnum = typeElement.getKind() == ElementKind.ENUM;
     boolean isTopLevel = typeElement.getNestingKind() == NestingKind.TOP_LEVEL;
@@ -428,7 +431,8 @@ public class ProxyGenerator extends AbstractProcessor {
 
       com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
       // TODO
-      List<ExecutableElement> beforeMethods = getBeforeMethods((TypeElement) this.processingEnv.getTypeUtils().asElement(aspectToGenerate.getAspect()));
+      Element apectElement = this.processingEnv.getTypeUtils().asElement(aspectToGenerate.getAspect());
+      List<ExecutableElement> beforeMethods = getBeforeMethods(asTypeElement(apectElement));
       for (ExecutableElement beforeMethod : beforeMethods) {
         methodBuilder.addStatement(buildAspectCall(beforeMethod));
       }
@@ -470,7 +474,7 @@ public class ProxyGenerator extends AbstractProcessor {
         buffer.append(", ");
       }
       first = false;
-      parameter.get
+//      parameter.get
     }
     buffer.append(')');
     return buffer.toString();
@@ -518,22 +522,14 @@ public class ProxyGenerator extends AbstractProcessor {
     // @AdviseBy#value()
     TypeMirror aspectClass = extractAspectClassTypeMirror(adviseBy);
     // @AdviseBy#value() = Aspect.class
-    DeclaredType declaredType = aspectClass.accept(DeclaredTypeExtractor.INSTANCE, null);
+    DeclaredType declaredType = asDeclaredType(aspectClass);
     return getQualifiedName(declaredType.asElement());
   }
 
   private TypeMirror extractAspectClassTypeMirror(AnnotationMirror adviseBy) {
     // @AdviseBy#value()
     AnnotationValue annotationValue = adviseBy.getElementValues().get(this.adviseByValueMethod);
-    return annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
-  }
-
-  private static String getQualifiedName(Element element) {
-    return element.accept(TypeElementExtractor.INSTANCE, null).getQualifiedName().toString();
-  }
-
-  private static String getSimpleName(TypeElement element) {
-    return element.getSimpleName().toString();
+    return asTypeMirror(annotationValue);
   }
 
   private static List<ExecutableElement> getNonPrivateConstrctors(TypeElement element) {
@@ -598,144 +594,5 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  static abstract class ExpectedElementExtractor<R> extends SimpleElementVisitor8<R, Void> {
-
-    @Override
-    protected R defaultAction(Element e, Void p) {
-      throw new IllegalArgumentException("unknown element type");
-    }
-
-  }
-
-  static final class TypeElementExtractor extends ExpectedElementExtractor<TypeElement> {
-
-    static final ElementVisitor<TypeElement, Void> INSTANCE = new TypeElementExtractor();
-
-    @Override
-    public TypeElement visitType(TypeElement e, Void p) {
-      return e;
-    }
-
-  }
-
-  static final class PackageElementExtractor extends ExpectedElementExtractor<PackageElement> {
-
-    static final ElementVisitor<PackageElement, Void> INSTANCE = new PackageElementExtractor();
-
-    @Override
-    public PackageElement visitPackage(PackageElement e, Void p) {
-      return e;
-    }
-
-  }
-
-  static abstract class ExpectedTypeExtractor<R> extends SimpleTypeVisitor8<R, Void> {
-
-    @Override
-    protected R defaultAction(TypeMirror e, Void p) {
-      throw new IllegalArgumentException("unknown element type");
-    }
-
-  }
-
-  static final class DeclaredTypeExtractor extends ExpectedTypeExtractor<DeclaredType> {
-
-    static final TypeVisitor<DeclaredType, Void> INSTANCE = new DeclaredTypeExtractor();
-
-    @Override
-    public DeclaredType visitDeclared(DeclaredType t, Void p) {
-      return t;
-    }
-
-  }
-
-  static abstract class ExpectedValueExtractor<R> extends SimpleAnnotationValueVisitor8<R, Void> {
-
-    @Override
-    protected R defaultAction(Object o, Void p) {
-      throw new IllegalArgumentException("unknown element type");
-    }
-
-  }
-
-  static final class TypeMirrorExtractor extends ExpectedValueExtractor<TypeMirror> {
-
-    static final AnnotationValueVisitor<TypeMirror, Void> INSTANCE = new TypeMirrorExtractor();
-
-    @Override
-    public TypeMirror visitType(TypeMirror t, Void p) {
-      return t;
-    }
-
-  }
-
-  static final class AnnotationMirrorExtractor extends ExpectedValueExtractor<AnnotationMirror> {
-
-    static final AnnotationValueVisitor<AnnotationMirror, Void> INSTANCE = new AnnotationMirrorExtractor();
-
-    @Override
-    public AnnotationMirror visitAnnotation(AnnotationMirror a, Void p) {
-      return a;
-    }
-
-  }
-
-  static final class AnnotationsMirrorExtractor extends ExpectedValueExtractor<List<? extends AnnotationValue>> {
-
-    static final AnnotationValueVisitor<List<? extends AnnotationValue>, Void> INSTANCE = new AnnotationsMirrorExtractor();
-
-    @Override
-    public List<? extends AnnotationValue> visitArray(List<? extends AnnotationValue> vals, Void p) {
-      return vals;
-    }
-
-  }
-
-  static final class ProxyToGenerate {
-
-    private final String targetClassName;
-    private final String aspectClassName;
-    private final TypeElement targetClassElement;
-    private final TypeMirror aspect;
-
-    ProxyToGenerate(String targetClassName, String apectClassName, TypeElement targetClassElement, TypeMirror aspect) {
-      this.targetClassName = targetClassName;
-      this.aspectClassName = apectClassName;
-      this.targetClassElement = targetClassElement;
-      this.aspect = aspect;
-    }
-
-    TypeElement getTargetClassElement() {
-      return this.targetClassElement;
-    }
-
-    TypeMirror getAspect() {
-      return this.aspect;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj == this) {
-        return true;
-      }
-      if (!(obj instanceof ProxyToGenerate)) {
-        return false;
-      }
-      ProxyToGenerate other = (ProxyToGenerate) obj;
-      return this.targetClassName.equals(other.targetClassName)
-              && this.aspectClassName.equals(other.aspectClassName);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(this.targetClassName, this.aspectClassName);
-    }
-
-    @Override
-    public String toString() {
-      return "aspect: " + this.aspectClassName + " -> target class:" + this.targetClassName;
-    }
-
-  }
 
 }
