@@ -533,7 +533,7 @@ public class ProxyGenerator extends AbstractProcessor {
       }
       // FIXME
       TypeElement object = this.processingEnv.getElementUtils().getTypeElement("java.lang.Object");
-      return method.getParameters().get(0).asType().equals(object.asType());
+      return this.processingEnv.getTypeUtils().isSameType(method.getParameters().get(0).asType(), object.asType());
     }
     return false;
   }
