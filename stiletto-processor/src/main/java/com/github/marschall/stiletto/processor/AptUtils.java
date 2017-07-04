@@ -1,12 +1,17 @@
 package com.github.marschall.stiletto.processor;
 
+import static javax.lang.model.element.Modifier.PRIVATE;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.AnnotationValueVisitor;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ElementVisitor;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
@@ -62,6 +67,14 @@ final class AptUtils {
       throw new IllegalArgumentException("unknown element type");
     }
 
+  }
+
+  static List<ExecutableElement> getNonPrivateConstrctors(TypeElement element) {
+    List<ExecutableElement> constrctors = new ArrayList<>(2);
+    for (Element member : element.getEnclosedElements()) {
+      member.accept(NonPrivateConstructorExtractor.INSTANCE, constrctors);
+    }
+    return constrctors;
   }
 
   static final class TypeElementExtractor extends ExpectedElementExtractor<TypeElement> {
@@ -133,6 +146,21 @@ final class AptUtils {
     @Override
     public List<? extends AnnotationValue> visitArray(List<? extends AnnotationValue> vals, Void p) {
       return vals;
+    }
+
+  }
+
+  static final class NonPrivateConstructorExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
+
+    static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstructorExtractor();
+
+    @Override
+    public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
+      if (e.getKind() == ElementKind.CONSTRUCTOR
+              && !e.getModifiers().contains(PRIVATE)) {
+        p.add(e);
+      }
+      return null;
     }
 
   }

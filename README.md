@@ -43,3 +43,14 @@ events
 https://spring.io/blog/2015/02/11/better-application-events-in-spring-framework-4-2
 
 org.springframework.dao.support.PersistenceExceptionTranslationInterceptor
+
+not proxied:
+- common interfaces:
+-- Cloneable, Serializable, Externalizable, Comparable
+- Object methods
+-- equals, hashCode -> can't guarantee symmetry
+-- toString
+-- clone
+-- finalize, pointless
+
+

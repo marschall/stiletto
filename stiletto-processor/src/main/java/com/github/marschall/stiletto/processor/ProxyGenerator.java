@@ -7,6 +7,7 @@ import static com.github.marschall.stiletto.processor.AptUtils.asTypeElement;
 import static com.github.marschall.stiletto.processor.AptUtils.asTypeMirror;
 import static com.github.marschall.stiletto.processor.AptUtils.getQualifiedName;
 import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
+import static com.github.marschall.stiletto.processor.AptUtils.getNonPrivateConstrctors;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
@@ -92,7 +93,6 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private ExecutableElement adviseByValueMethod;
 
-  // TODO el?
   private NamingStrategy namingStrategy;
 
   private boolean addGenerated;
@@ -253,34 +253,6 @@ public class ProxyGenerator extends AbstractProcessor {
     return getMethodsAnnotatedWith(aspect, this.afterThrowing);
   }
 
-  private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement aspect, TypeElement annotation) {
-    TypeMirror annotationType = annotation.asType();
-    List<ExecutableElement> methods = new ArrayList<>();
-    for (Element member : this.processingEnv.getElementUtils().getAllMembers(aspect)) {
-      if (member.getKind() == ElementKind.METHOD) {
-        for (AnnotationMirror mirror : member.getAnnotationMirrors()) {
-          if (mirror.getAnnotationType().equals(annotationType)) {
-            methods.add((ExecutableElement) member);
-          }
-        }
-      }
-    }
-    return methods;
-  }
-
-  private static boolean isOverriable(Element method) {
-    return !containsAny(method.getModifiers(), NON_OVERRIDABLE);
-  }
-
-  private static <T> boolean containsAny(Set<T> set, Set<?> elements) {
-    for (Object element : elements) {
-      if (set.contains(element)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private List<ExecutableElement> getMethodsToImplement(TypeElement targetClass) {
     List<ExecutableElement> methods = new ArrayList<>();
     for (Element member : this.processingEnv.getElementUtils().getAllMembers(targetClass)) {
@@ -289,46 +261,6 @@ public class ProxyGenerator extends AbstractProcessor {
     return methods;
   }
 
-  private boolean isObjectMethod(ExecutableElement method) {
-    // FIXME
-    TypeElement object = this.processingEnv.getElementUtils().getTypeElement("java.lang.Object");
-    return this.processingEnv.getElementUtils().getAllMembers(object).contains(method);
-  }
-
-  private boolean isFinalObjectMethod(ExecutableElement method) {
-    Name methodName = method.getSimpleName();
-    int parameterCount = method.getParameters().size();
-    if (methodName.contentEquals("getClass") && parameterCount == 0) {
-      // java.lang.Object.getClass()
-      return true;
-    }
-    if (methodName.contentEquals("notify") && parameterCount == 0) {
-      // java.lang.Object.notify()
-      return true;
-    }
-    if (methodName.contentEquals("notifyAll") && parameterCount == 0) {
-      // java.lang.Object.notifyAll()
-      return true;
-    }
-    if (methodName.contentEquals("wait")) {
-      if (parameterCount == 0) {
-        // java.lang.Object.wait()
-        return true;
-      } else if (parameterCount == 1) {
-        if (method.getParameters().get(0).asType().equals(this.longType)) {
-          // java.lang.Object.wait(long)
-          return true;
-        }
-      } else if (parameterCount == 2) {
-        if (method.getParameters().get(0).asType().equals(this.longType)
-                && method.getParameters().get(1).asType().equals(this.intType)) {
-          // java.lang.Object.wait(long, int)
-          return true;
-        }
-      }
-    }
-    return false;
-  }
 
   private void generateProxyProtected(ProxyToGenerate proxyToGenerate) {
     try {
@@ -349,13 +281,7 @@ public class ProxyGenerator extends AbstractProcessor {
     FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", PRIVATE, FINAL)
             .build();
 
-    // TODO do not proxy equals and hashCode
-    // TODO do not proxy finalize
-    // TODO do not proxy Cloneable, Serializable, Externalizable, Comparable
-    // TODO toString?
-
     Builder proxyClassBilder = TypeSpec.classBuilder(proxyClassName)
-            // TODO always public?
             .addModifiers(PUBLIC, FINAL)
             .addJavadoc("Proxy class for {@link $T} being advised by {@link $T}.\n",
                     TypeName.get(targetClass.asType()),
@@ -397,8 +323,6 @@ public class ProxyGenerator extends AbstractProcessor {
     List<ExecutableElement> nonPrivateConstrctors = getNonPrivateConstrctors(targetClass);
     if (nonPrivateConstrctors.isEmpty()) {
       proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
-              // TODO javadoc
-              // TODO keep visibility?
               .addModifiers(PUBLIC)
               .addParameter(TypeName.get(targetClass.asType()), "targetObject")
               .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
@@ -409,8 +333,6 @@ public class ProxyGenerator extends AbstractProcessor {
               .build());
     } else {
       for (ExecutableElement constrctor : nonPrivateConstrctors) {
-        // TODO javadoc
-        // TODO keep visibility?
         proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(PUBLIC)
                 .addParameters(getParameters(constrctor))
@@ -434,7 +356,7 @@ public class ProxyGenerator extends AbstractProcessor {
       Element apectElement = this.processingEnv.getTypeUtils().asElement(aspectToGenerate.getAspect());
       List<ExecutableElement> beforeMethods = getBeforeMethods(asTypeElement(apectElement));
       for (ExecutableElement beforeMethod : beforeMethods) {
-        methodBuilder.addStatement(buildAspectCall(beforeMethod));
+        methodBuilder.addStatement(buildAdviceCall(beforeMethod));
       }
 
       methodBuilder.addStatement((isVoid ? "" : "return ") + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
@@ -457,25 +379,19 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  private static Iterable<ParameterSpec> getParameters(ExecutableElement executableElement) {
-    return executableElement.getParameters().stream()
-            .map(ParameterSpec::get)
-            .collect(Collectors.toList());
-  }
-
-  private static String buildAspectCall(ExecutableElement method) {
+  private static String buildAdviceCall(ExecutableElement adviceMethod) {
     StringBuilder buffer = new StringBuilder();
     buffer.append("this.aspect.");
-    buffer.append(method.getSimpleName());
+    buffer.append(adviceMethod.getSimpleName());
     buffer.append('(');
-    boolean first = true;
-    for (VariableElement parameter: method.getParameters()) {
-      if (!first) {
-        buffer.append(", ");
-      }
-      first = false;
+//    boolean first = true;
+//    for (VariableElement parameter: adviceMethod.getParameters()) {
+//      if (!first) {
+//        buffer.append(", ");
+//      }
+//      first = false;
 //      parameter.get
-    }
+//    }
     buffer.append(')');
     return buffer.toString();
   }
@@ -532,20 +448,6 @@ public class ProxyGenerator extends AbstractProcessor {
     return asTypeMirror(annotationValue);
   }
 
-  private static List<ExecutableElement> getNonPrivateConstrctors(TypeElement element) {
-    List<ExecutableElement> constrctors = new ArrayList<>(2);
-    for (Element member : element.getEnclosedElements()) {
-      member.accept(NonPrivateConstructorExtractor.INSTANCE, constrctors);
-    }
-    return constrctors;
-  }
-
-
-  private String getPackageName(Element element) {
-    PackageElement packageElement = this.processingEnv.getElementUtils().getPackageOf(element);
-    return packageElement.getQualifiedName().toString();
-  }
-
   private ExecutableElement getValueMethod(TypeElement typeElement) {
     String methodName = "value";
     for (Element member : typeElement.getEnclosedElements()) {
@@ -567,32 +469,120 @@ public class ProxyGenerator extends AbstractProcessor {
     return true;
   }
 
-  static final class NonPrivateConstructorExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
+  // generic JavaPoet stuff
 
-    static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstructorExtractor();
+  private static Iterable<ParameterSpec> getParameters(ExecutableElement executableElement) {
+    return executableElement.getParameters().stream()
+            .map(ParameterSpec::get)
+            .collect(Collectors.toList());
+  }
 
-    @Override
-    public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
-      if (e.getKind() == ElementKind.CONSTRUCTOR
-              && !e.getModifiers().contains(PRIVATE)) {
-        p.add(e);
+  // generic APT stuff
+
+  private static boolean isOverriable(Element method) {
+    return !containsAny(method.getModifiers(), NON_OVERRIDABLE);
+  }
+
+  private static <T> boolean containsAny(Set<T> set, Set<?> elements) {
+    for (Object element : elements) {
+      if (set.contains(element)) {
+        return true;
       }
-      return null;
     }
+    return false;
+  }
 
+  private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement type, TypeElement annotation) {
+    TypeMirror annotationType = annotation.asType();
+    List<ExecutableElement> methods = new ArrayList<>();
+    for (Element member : this.processingEnv.getElementUtils().getAllMembers(type)) {
+      if (member.getKind() == ElementKind.METHOD) {
+        for (AnnotationMirror mirror : member.getAnnotationMirrors()) {
+          if (mirror.getAnnotationType().equals(annotationType)) {
+            methods.add((ExecutableElement) member);
+          }
+        }
+      }
+    }
+    return methods;
+  }
+
+  private String getPackageName(Element element) {
+    PackageElement packageElement = this.processingEnv.getElementUtils().getPackageOf(element);
+    return packageElement.getQualifiedName().toString();
+  }
+
+
+  private boolean isOverridableObjectMethod(ExecutableElement method) {
+    Name methodName = method.getSimpleName();
+    if (methodName.contentEquals("finalize")) {
+      return method.getParameters().size() == 0;
+    }
+    if (methodName.contentEquals("toString")) {
+      return method.getParameters().size() == 0;
+    }
+    if (methodName.contentEquals("clone")) {
+      return method.getParameters().size() == 0;
+    }
+    if (methodName.contentEquals("hashCode")) {
+      return method.getParameters().size() == 0;
+    }
+    if (methodName.contentEquals("equals")) {
+      if (method.getParameters().size() != 1) {
+        return false;
+      }
+      // FIXME
+      TypeElement object = this.processingEnv.getElementUtils().getTypeElement("java.lang.Object");
+      return method.getParameters().get(0).asType().equals(object.asType());
+    }
+    return false;
+  }
+
+  private boolean isFinalObjectMethod(ExecutableElement method) {
+    Name methodName = method.getSimpleName();
+    int parameterCount = method.getParameters().size();
+    if (methodName.contentEquals("getClass") && parameterCount == 0) {
+      // java.lang.Object.getClass()
+      return true;
+    }
+    if (methodName.contentEquals("notify") && parameterCount == 0) {
+      // java.lang.Object.notify()
+      return true;
+    }
+    if (methodName.contentEquals("notifyAll") && parameterCount == 0) {
+      // java.lang.Object.notifyAll()
+      return true;
+    }
+    if (methodName.contentEquals("wait")) {
+      if (parameterCount == 0) {
+        // java.lang.Object.wait()
+        return true;
+      } else if (parameterCount == 1) {
+        if (method.getParameters().get(0).asType().equals(this.longType)) {
+          // java.lang.Object.wait(long)
+          return true;
+        }
+      } else if (parameterCount == 2) {
+        if (method.getParameters().get(0).asType().equals(this.longType)
+                && method.getParameters().get(1).asType().equals(this.intType)) {
+          // java.lang.Object.wait(long, int)
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   final class ImplementableMethodExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
 
     @Override
     public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
-      if (e.getKind() == ElementKind.METHOD && isOverriable(e) && !isObjectMethod(e)) {
+      if (e.getKind() == ElementKind.METHOD && isOverriable(e) && !isOverridableObjectMethod(e)) {
         p.add(e);
       }
       return null;
     }
 
   }
-
 
 }
