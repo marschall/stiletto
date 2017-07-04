@@ -9,6 +9,7 @@ import static com.github.marschall.stiletto.processor.AptUtils.asTypeMirror;
 import static com.github.marschall.stiletto.processor.AptUtils.getNonPrivateConstrctors;
 import static com.github.marschall.stiletto.processor.AptUtils.getQualifiedName;
 import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
+import static com.github.marschall.stiletto.processor.AptUtils.getSignature;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
@@ -546,8 +547,8 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private String evaluate(String expression, TypeElement targetClassElement, ExecutableElement joinpointElement) {
-    TargetClass targetClass = null;
-    JoinPoint joinPoint = null;
+    TargetClass targetClass = new TargetClass(targetClassElement.getQualifiedName().toString());
+    JoinPoint joinPoint = new JoinPoint(joinpointElement.getSimpleName().toString(), getSignature(joinpointElement));
     return this.evaluator.evaluate(expression, targetClass, joinPoint);
   }
 

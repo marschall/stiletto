@@ -13,6 +13,8 @@ No
 - framework or container dependencies (apart from annotations and interfaces)
 - (runtime) bytecode generation -> no source
 - ThreadLocal hacks
+- runtime library
+- not framework dependenices (other than annoations or interfaces) -> easy to migrate to something else
 
 But
 - instantiation where unavoidable

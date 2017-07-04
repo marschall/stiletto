@@ -13,6 +13,7 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
@@ -28,6 +29,22 @@ final class AptUtils {
 
   private AptUtils() {
     throw new IllegalArgumentException("not instantiable");
+  }
+
+  static String getSignature(ExecutableElement executableElement) {
+    StringBuilder buffer = new StringBuilder();
+    buffer.append(executableElement.getSimpleName());
+    buffer.append('(');
+    boolean first = true;
+    for (VariableElement parameter : executableElement.getParameters()) {
+      if (!first) {
+        buffer.append(", ");
+      }
+      buffer.append(parameter.asType().toString());
+      first = false;
+    }
+    buffer.append(')');
+    return buffer.toString();
   }
 
   static String getQualifiedName(Element element) {

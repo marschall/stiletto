@@ -19,11 +19,25 @@ import com.github.marschall.stiletto.processor.el.TargetClass;
 
 final class ExpressionEvaluator {
 
-  final String evaluate(String expression, TargetClass targetClass, JoinPoint joinPoint) {
+  String evaluate(String expression, TargetClass targetClass, JoinPoint joinPoint) {
+    Thread currentThread = Thread.currentThread();
+    ClassLoader oldTccl = currentThread.getContextClassLoader();
+    currentThread.setContextClassLoader(ExpressionEvaluator.class.getClassLoader());
+    try {
+      // uses Thread.currentThread().getContextClassLoader() for implementation discovery
+      // per default does not contain a dependency to the el-impl if the processor
+      // is set up via a the maven-compiler-plugin rather than a project dependency
+      return evaluateWithTccl(expression, targetClass, joinPoint);
+    } finally {
+      currentThread.setContextClassLoader(oldTccl);
+    }
+  }
+
+  String evaluateWithTccl(String expression, TargetClass targetClass, JoinPoint joinPoint) {
     // http://illegalargumentexception.blogspot.ch/2008/04/java-using-el-outside-j2ee.html
     // https://docs.oracle.com/javaee/7/api/javax/el/ELProcessor.html
 
-    ExpressionFactory expressionFactory = newExpresionFactory();
+    ExpressionFactory expressionFactory = ExpressionFactory.newInstance();
 
 //    CompositeELResolver compositeELResolver = new CompositeELResolver();
 //    compositeELResolver.add(new BeanELResolver());
@@ -40,20 +54,6 @@ final class ExpressionEvaluator {
 
     ValueExpression valueExpression = expressionFactory.createValueExpression(context, expression, String.class);
     return (String) valueExpression.getValue(context);
-  }
-
-  private ExpressionFactory newExpresionFactory() {
-    Thread currentThread = Thread.currentThread();
-    ClassLoader oldTccl = currentThread.getContextClassLoader();
-    currentThread.setContextClassLoader(ExpressionEvaluator.class.getClassLoader());
-    try {
-      // uses Thread.currentThread().getContextClassLoader() for implementation discovery
-      // per default does not contain a dependency to the el-impl if the processor
-      // is set up via a the maven-compiler-plugin rather than a project dependency
-      return ExpressionFactory.newInstance();
-    } finally {
-      currentThread.setContextClassLoader(oldTccl);
-    }
   }
 
   static final class SimpleELContext extends ELContext {
