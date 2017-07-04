@@ -47,9 +47,12 @@ final class AptUtils {
     return element.accept(TypeElementExtractor.INSTANCE, null);
   }
 
-
   static TypeMirror asTypeMirror(AnnotationValue annotationValue) {
     return annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
+  }
+
+  static String asString(AnnotationValue annotationValue) {
+    return annotationValue.accept(StringExtractor.INSTANCE, null);
   }
 
   static AnnotationMirror asAnnotationMirror(AnnotationValue annotationValue) {
@@ -124,6 +127,17 @@ final class AptUtils {
     @Override
     public TypeMirror visitType(TypeMirror t, Void p) {
       return t;
+    }
+
+  }
+
+  static final class StringExtractor extends ExpectedValueExtractor<String> {
+
+    static final AnnotationValueVisitor<String, Void> INSTANCE = new StringExtractor();
+
+    @Override
+    public String visitString(String s, Void p) {
+      return s;
     }
 
   }

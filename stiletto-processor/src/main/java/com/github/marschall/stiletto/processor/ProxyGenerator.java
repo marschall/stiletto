@@ -3,11 +3,12 @@ package com.github.marschall.stiletto.processor;
 import static com.github.marschall.stiletto.processor.AptUtils.asAnnotationMirror;
 import static com.github.marschall.stiletto.processor.AptUtils.asAnnotationValues;
 import static com.github.marschall.stiletto.processor.AptUtils.asDeclaredType;
+import static com.github.marschall.stiletto.processor.AptUtils.asString;
 import static com.github.marschall.stiletto.processor.AptUtils.asTypeElement;
 import static com.github.marschall.stiletto.processor.AptUtils.asTypeMirror;
+import static com.github.marschall.stiletto.processor.AptUtils.getNonPrivateConstrctors;
 import static com.github.marschall.stiletto.processor.AptUtils.getQualifiedName;
 import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
-import static com.github.marschall.stiletto.processor.AptUtils.getNonPrivateConstrctors;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
@@ -39,7 +40,6 @@ import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
@@ -58,6 +58,8 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 
+import com.github.marschall.stiletto.processor.el.JoinPoint;
+import com.github.marschall.stiletto.processor.el.TargetClass;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
@@ -103,6 +105,11 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private TypeMirror objectType;
 
+  private TypeElement evaluateElement;
+
+  private TypeMirror evaluateType;
+
+  // FIXME should all be type mirrors
   private TypeElement before;
 
   private TypeElement around;
@@ -112,6 +119,8 @@ public class ProxyGenerator extends AbstractProcessor {
   private TypeElement afterReturning;
 
   private TypeElement afterFinally;
+
+  private ExpressionEvaluator evaluator;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -132,6 +141,9 @@ public class ProxyGenerator extends AbstractProcessor {
     this.intType = typeUtils.getPrimitiveType(TypeKind.INT);
     this.longType = typeUtils.getPrimitiveType(TypeKind.LONG);
     this.objectType = this.processingEnv.getElementUtils().getTypeElement("java.lang.Object").asType();
+    this.evaluateElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Evaluate");
+    this.evaluateType = this.evaluateElement.asType();
+    this.evaluator = new ExpressionEvaluator();
   }
 
   @Override
@@ -282,7 +294,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private void generateProxy(ProxyToGenerate aspectToGenerate) throws IOException {
     TypeElement targetClass = aspectToGenerate.getTargetClassElement();
-    String proxyClassName = generateClassName(targetClass);
+    String proxyClassName = buildClassName(targetClass);
     String packageName = getPackageName(targetClass);
 
     FieldSpec targetObjectField = FieldSpec.builder(TypeName.get(targetClass.asType()), "targetObject", PRIVATE, FINAL)
@@ -348,7 +360,7 @@ public class ProxyGenerator extends AbstractProcessor {
                 .addParameter(TypeName.get(targetClass.asType()), "targetObject")
                 .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
                 // add super call even for default constructor in oder to aid debugging
-                .addStatement(generateSuperCall(constrctor))
+                .addStatement(buildSuperCall(constrctor))
                 .addStatement("$T.requireNonNull(targetObject, $S)", Objects.class, "targetObject")
                 .addStatement("this.targetObject = targetObject")
                 .addStatement("$T.requireNonNull(aspect, $S)", Objects.class, "aspect")
@@ -365,7 +377,8 @@ public class ProxyGenerator extends AbstractProcessor {
       Element apectElement = this.processingEnv.getTypeUtils().asElement(aspectToGenerate.getAspect());
       List<ExecutableElement> beforeMethods = getBeforeMethods(asTypeElement(apectElement));
       for (ExecutableElement beforeMethod : beforeMethods) {
-        methodBuilder.addStatement(buildAdviceCall(beforeMethod));
+        Statement adviceCall = buildAdviceCall(beforeMethod, targetClass, method);
+        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
       }
 
       methodBuilder.addStatement((isVoid ? "" : "return ") + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
@@ -388,24 +401,55 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  private static String buildAdviceCall(ExecutableElement adviceMethod) {
+  private Statement buildAdviceCall(ExecutableElement adviceMethod, TypeElement targetClassElement, ExecutableElement joinpointElement) {
     StringBuilder buffer = new StringBuilder();
+    List<Object> arguments = new ArrayList<>(adviceMethod.getParameters().size());
     buffer.append("this.aspect.");
     buffer.append(adviceMethod.getSimpleName());
     buffer.append('(');
-    //    boolean first = true;
-    //    for (VariableElement parameter: adviceMethod.getParameters()) {
-    //      if (!first) {
-    //        buffer.append(", ");
-    //      }
-    //      first = false;
-    //      parameter.get
-    //    }
+        boolean first = true;
+        for (VariableElement parameter: adviceMethod.getParameters()) {
+          if (!first) {
+            buffer.append(", ");
+          }
+          first = false;
+          for (AnnotationMirror mirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(parameter)) {
+            DeclaredType annotationType = mirror.getAnnotationType();
+            if (isSameType(annotationType, this.evaluateType)) {
+              ExecutableElement valueMethod = this.getValueMethod(this.evaluateElement);
+              AnnotationValue annotationValue = mirror.getElementValues().get(valueMethod);
+              String expression = asString(annotationValue);
+              // TODO check
+              buffer.append("$S");
+              arguments.add(evaluate(expression, targetClassElement, joinpointElement));
+            }
+          }
+        }
     buffer.append(')');
-    return buffer.toString();
+    return new Statement(buffer.toString(), arguments);
   }
 
-  private static String generateSuperCall(ExecutableElement constructor) {
+  static final class Statement {
+
+    private final String format;
+    private final Object[] arguments;
+
+    Statement(String format, List<Object> arguments) {
+      this.format = format;
+      this.arguments = arguments.toArray(new Object[0]);
+    }
+
+    String getFormat() {
+      return this.format;
+    }
+
+    Object[] getArguments() {
+      return this.arguments;
+    }
+
+  }
+
+  private static String buildSuperCall(ExecutableElement constructor) {
     return buildDelegateCall("super", constructor);
   }
 
@@ -438,7 +482,7 @@ public class ProxyGenerator extends AbstractProcessor {
     }
   }
 
-  private String generateClassName(TypeElement targetClass) {
+  private String buildClassName(TypeElement targetClass) {
     String simpleName = getSimpleName(targetClass);
     return this.namingStrategy.deriveClassName(simpleName);
   }
@@ -499,6 +543,12 @@ public class ProxyGenerator extends AbstractProcessor {
       }
     }
     return false;
+  }
+
+  private String evaluate(String expression, TypeElement targetClassElement, ExecutableElement joinpointElement) {
+    TargetClass targetClass = null;
+    JoinPoint joinPoint = null;
+    return this.evaluator.evaluate(expression, targetClass, joinPoint);
   }
 
   private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement type, TypeElement annotation) {
@@ -596,6 +646,42 @@ public class ProxyGenerator extends AbstractProcessor {
         p.add(e);
       }
       return null;
+    }
+
+  }
+
+  static final class MethodContext {
+
+    boolean needsReturnVariable() {
+      return false;
+    }
+
+    String getReturnVariableName() {
+      throw new IllegalStateException("not yet implemented");
+    }
+
+    boolean needsExectionTimeMillis() {
+      return false;
+    }
+
+    String getExectionTimeMillisName() {
+      throw new IllegalStateException("not yet implemented");
+    }
+
+    boolean needsExectionTimeNanos() {
+      return false;
+    }
+
+    String getExectionTimeNanosName() {
+      throw new IllegalStateException("not yet implemented");
+    }
+
+    boolean needsCatch() {
+      return false;
+    }
+
+    boolean needsFinally() {
+      return false;
     }
 
   }
