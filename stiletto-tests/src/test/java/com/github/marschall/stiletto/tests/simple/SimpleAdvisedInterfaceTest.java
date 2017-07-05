@@ -23,7 +23,7 @@ public class SimpleAdvisedInterfaceTest {
       return "ok";
     };
 
-    SimpleAdvisedInterface_ proxy = new SimpleAdvisedInterface_(targetObject, this.aspect);
+    SimpleAdvisedInterface proxy = new SimpleAdvisedInterface_(targetObject, this.aspect);
 
     assertEquals(0, this.aspect.getInvocationCount());
     assertEquals("ok", proxy.simpleMethod());
