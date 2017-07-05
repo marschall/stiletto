@@ -6,3 +6,4 @@
 - reconsider proxing Object methods and common interfaces
 - reconsider visibilty of proxy class and proxy class constructors
 - add javadoc to proxy class constructors
+- better advice selection for primitive types
