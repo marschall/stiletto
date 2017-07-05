@@ -6,7 +6,7 @@ import com.github.marschall.stiletto.api.generation.AdviseBy;
 
 @Transactional
 @AdviseBy(TransactionalAspect.class)
-public class SimpleServie implements SimpleServiceInterface {
+public class SimpleTransactionalService implements SimpleTransactionalInterface {
 
   @Override
   public String simpleServiceMethod() {

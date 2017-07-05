@@ -15,8 +15,8 @@ public class SpringTransactionalConfiguration {
   }
 
   @Bean
-  public SimpleServiceInterface simpleService() {
-    return new SimpleServie();
+  public SimpleTransactionalInterface simpleService() {
+    return new SimpleTransactionalService();
   }
 
 }

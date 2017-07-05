@@ -14,10 +14,10 @@ public class StilettoTransactionalConfiguration {
   }
 
   @Bean
-  public SimpleServiceInterface simpleService() {
-    SimpleServie targetObject = new SimpleServie();
+  public SimpleTransactionalInterface simpleService() {
+    SimpleTransactionalService targetObject = new SimpleTransactionalService();
     TransactionalAspect aspect = new TransactionalAspect(this.txManager());
-    return new SimpleServie_(targetObject, aspect);
+    return new SimpleTransactionalService_(targetObject, aspect);
   }
 
 }

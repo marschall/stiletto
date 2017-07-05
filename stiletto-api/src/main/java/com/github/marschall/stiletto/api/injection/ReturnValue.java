@@ -12,6 +12,6 @@ import java.lang.annotation.Target;
 @Target(PARAMETER)
 public @interface ReturnValue {
 
-  // only for after
+  // only for @AfterReturning
 
 }
