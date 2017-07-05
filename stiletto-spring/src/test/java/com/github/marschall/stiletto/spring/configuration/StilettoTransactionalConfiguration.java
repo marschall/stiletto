@@ -1,8 +1,14 @@
-package com.github.marschall.stiletto.spring;
+package com.github.marschall.stiletto.spring.configuration;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
+
+import com.github.marschall.stiletto.spring.NoOpTransactionManager;
+import com.github.marschall.stiletto.spring.SimpleTransactionalInterface;
+import com.github.marschall.stiletto.spring.SimpleTransactionalService;
+import com.github.marschall.stiletto.spring.SimpleTransactionalService_;
+import com.github.marschall.stiletto.spring.TransactionalAspect;
 
 @Configuration
 // no @EnableTransactionManagement

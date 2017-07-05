@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.github.marschall.stiletto.spring.configuration.SpringTransactionalConfiguration;
+
 @Transactional
 @ContextConfiguration(classes = SpringTransactionalConfiguration.class)
 public class SpringTransactionalTest extends AbstractSpringTest {
