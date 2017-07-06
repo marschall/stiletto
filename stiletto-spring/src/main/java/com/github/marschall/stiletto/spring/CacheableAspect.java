@@ -9,10 +9,12 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.interceptor.CacheResolver;
 import org.springframework.cache.interceptor.KeyGenerator;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.github.marschall.stiletto.api.advice.AfterReturning;
 import com.github.marschall.stiletto.api.advice.Around;
 import com.github.marschall.stiletto.api.advice.Before;
+import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.MethodCall;
 import com.github.marschall.stiletto.api.injection.ReturnValue;
@@ -35,20 +37,23 @@ public class CacheableAspect {
     this.cacheNames = cacheNames;
   }
 
-  @Cacheable
   @Around
+  @Cacheable
+  @WithAnnotationMatching(Cacheable.class)
   public void invoke(@DeclaredAnnotation Cacheable cacheable, @MethodCall ActualMethodCallWithoutResult call) {
 
   }
 
-  @CachePut
   @AfterReturning
+  @CachePut
+  @WithAnnotationMatching(CachePut.class)
   public void cachePut(@DeclaredAnnotation CachePut cachePut, @ReturnValue Object value) {
 
   }
 
-  @CacheEvict
   @AfterReturning
+  @CacheEvict(beforeInvocation = false)
+  @WithAnnotationMatching(CacheEvict.class)
   public void cacheEvictAfter(@DeclaredAnnotation CacheEvict cacheEvict, @DeclaredAnnotation Optional<CacheConfig> cacheConfig) {
     if (cacheEvict.allEntries()) {
 
@@ -57,8 +62,9 @@ public class CacheableAspect {
     }
   }
 
-  @CacheEvict(beforeInvocation = true)
   @Before
+  @CacheEvict(beforeInvocation = true)
+  @WithAnnotationMatching(CacheEvict.class)
   public void cacheEvictTrue(@DeclaredAnnotation CacheEvict cacheEvict) {
     if (cacheEvict.allEntries()) {
 

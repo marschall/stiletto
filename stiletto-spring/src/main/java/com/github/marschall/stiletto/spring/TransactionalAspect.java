@@ -4,9 +4,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.interceptor.TransactionAttribute;
 
 import com.github.marschall.stiletto.api.advice.Around;
+import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.injection.MethodCall;
@@ -32,6 +32,8 @@ public class TransactionalAspect {
   }
 
   @Around
+  @Transactional
+  @WithAnnotationMatching(Transactional.class)
   public void invoke(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
           @MethodCall ActualMethodCallWithoutResult call) {
@@ -87,54 +89,6 @@ public class TransactionalAspect {
     @Override
     public String getName() {
       return this.joinpointIdentification;
-    }
-
-  }
-
-  static final class TransactionalTransactionAttribute implements TransactionAttribute {
-
-    private final Transactional transactional;
-
-    TransactionalTransactionAttribute(Transactional transactional) {
-      this.transactional = transactional;
-    }
-
-    @Override
-    public int getPropagationBehavior() {
-      return this.transactional.propagation().value();
-    }
-
-    @Override
-    public int getIsolationLevel() {
-      return this.transactional.isolation().value();
-    }
-
-    @Override
-    public int getTimeout() {
-      return this.transactional.timeout();
-    }
-
-    @Override
-    public boolean isReadOnly() {
-      return this.transactional.readOnly();
-    }
-
-    @Override
-    public String getName() {
-      // TODO Auto-generated method stub
-      return null;
-    }
-
-    @Override
-    public String getQualifier() {
-      // TODO Auto-generated method stub
-      return null;
-    }
-
-    @Override
-    public boolean rollbackOn(Throwable ex) {
-      // TODO Auto-generated method stub
-      return true;
     }
 
   }
