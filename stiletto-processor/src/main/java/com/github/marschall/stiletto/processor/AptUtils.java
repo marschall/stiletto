@@ -15,6 +15,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
@@ -29,6 +30,15 @@ final class AptUtils {
 
   private AptUtils() {
     throw new IllegalArgumentException("not instantiable");
+  }
+
+  static boolean containsAnyNonVoid(List<? extends ExecutableElement> methods) {
+    for (ExecutableElement method : methods) {
+      if (method.getReturnType().getKind() != TypeKind.VOID) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static String getSignature(ExecutableElement executableElement) {

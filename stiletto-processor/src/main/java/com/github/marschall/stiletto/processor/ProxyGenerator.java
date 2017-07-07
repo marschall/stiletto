@@ -9,6 +9,7 @@ import static com.github.marschall.stiletto.processor.AptUtils.asTypeMirror;
 import static com.github.marschall.stiletto.processor.AptUtils.getNonPrivateConstrctors;
 import static com.github.marschall.stiletto.processor.AptUtils.getQualifiedName;
 import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
+import static com.github.marschall.stiletto.processor.AptUtils.containsAnyNonVoid;
 import static com.github.marschall.stiletto.processor.AptUtils.getSignature;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
@@ -284,6 +285,10 @@ public class ProxyGenerator extends AbstractProcessor {
     return getMethodsAnnotatedWith(aspect, this.afterFinally);
   }
 
+  private List<ExecutableElement> getAroundMethods(TypeElement aspect) {
+    return getMethodsAnnotatedWith(aspect, this.around);
+  }
+
   private List<ExecutableElement> getAfterThrowingMethods(TypeElement aspect) {
     return getMethodsAnnotatedWith(aspect, this.afterThrowing);
   }
@@ -384,20 +389,43 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
-      JoinPointContext joinPointContext = new JoinPointContext(targetClass, method);
-      boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
-
-      com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
       // TODO
       Element apectElement = this.processingEnv.getTypeUtils().asElement(aspectToGenerate.getAspect());
-      List<ExecutableElement> beforeMethods = getBeforeMethods(asTypeElement(apectElement));
+      TypeElement aspectType = asTypeElement(apectElement);
+
+      List<ExecutableElement> afterReturningMethods = getAfterReturningMethods(aspectType);
+      List<ExecutableElement> afterFinallyMethods = getAfterFinallyMethods(aspectType);
+      List<ExecutableElement> aroundMethods = getAroundMethods(aspectType);
+      List<ExecutableElement> beforeMethods = getBeforeMethods(aspectType);
+      boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
+      boolean needsReturnValue = !isVoid
+              && !afterReturningMethods.isEmpty()
+              && !afterFinallyMethods.isEmpty()
+              && !aroundMethods.isEmpty();
+
+      JoinPointContext joinPointContext = new JoinPointContext(targetClass, method);
+
+      com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
+
       for (ExecutableElement beforeMethod : beforeMethods) {
         AdviceContext adviceContext = new AdviceContext(beforeMethod, joinPointContext);
         Statement adviceCall = buildAdviceCall(adviceContext);
         methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
       }
 
-      methodBuilder.addStatement((isVoid ? "" : "return ") + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
+      if (needsReturnValue) {
+        methodBuilder.addStatement("$T returnValue = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReceiverType());
+      }
+
+      // add after methods
+
+      if (needsReturnValue) {
+        methodBuilder.addStatement("return returnValue");
+      } else if (isVoid) {
+        methodBuilder.addStatement(buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
+      } {
+        methodBuilder.addStatement("return " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
+      }
 
       proxyClassBilder.addMethod(methodBuilder.build());
     }
@@ -591,6 +619,17 @@ public class ProxyGenerator extends AbstractProcessor {
   private boolean isSubclassingRequired(TypeElement typeElement) {
     if (typeElement.getKind() == ElementKind.INTERFACE) {
       return false;
+    }
+    for (Element element : this.processingEnv.getElementUtils().getAllMembers(typeElement)) {
+      if (element.getKind() == ElementKind.METHOD && isOverriable(element)) {
+        if (element.getEnclosingElement().getKind() != ElementKind.INTERFACE) {
+          // TODO check if method overrides any interface method
+//          ExecutableElement interfaceMethod = null;
+//          if (!this.processingEnv.getElementUtils().overrides((ExecutableElement) element, interfaceMethod, typeElement)) {
+//            return false;
+//          }
+        }
+      }
     }
     // javax.lang.model.util.Elements.overrides(ExecutableElement, ExecutableElement, TypeElement)
     return true;
