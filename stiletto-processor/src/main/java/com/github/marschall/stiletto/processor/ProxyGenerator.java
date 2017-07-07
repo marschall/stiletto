@@ -399,9 +399,9 @@ public class ProxyGenerator extends AbstractProcessor {
       List<ExecutableElement> beforeMethods = getBeforeMethods(aspectType);
       boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
       boolean needsReturnValue = !isVoid
-              && !afterReturningMethods.isEmpty()
-              && !afterFinallyMethods.isEmpty()
-              && !aroundMethods.isEmpty();
+              && (!afterReturningMethods.isEmpty()
+              || !afterFinallyMethods.isEmpty()
+              || !aroundMethods.isEmpty());
 
       JoinPointContext joinPointContext = new JoinPointContext(targetClass, method);
 
@@ -414,7 +414,7 @@ public class ProxyGenerator extends AbstractProcessor {
       }
 
       if (needsReturnValue) {
-        methodBuilder.addStatement("$T returnValue = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReceiverType());
+        methodBuilder.addStatement("$T returnValue = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReturnType());
       }
 
       // add after methods
@@ -423,7 +423,7 @@ public class ProxyGenerator extends AbstractProcessor {
         methodBuilder.addStatement("return returnValue");
       } else if (isVoid) {
         methodBuilder.addStatement(buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
-      } {
+      } else {
         methodBuilder.addStatement("return " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
       }
 
