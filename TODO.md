@@ -9,6 +9,7 @@
 - better advice selection for primitive types
 - can @AfterReturning change return value?
 - @Around should probably can change return value
+- @ReturnValue on void method?
 
 - method selection on annotation
 - @OnlyWithAnnotationPresent(Transactional.class)
