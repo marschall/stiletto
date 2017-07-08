@@ -67,7 +67,7 @@ public class TransactionalAspect {
    * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute#rollbackOn(Throwable)
    * @see org.springframework.transaction.interceptor.TransactionAttribute#rollbackOn(Throwable)
    */
-  private boolean rollbackOn(Throwable ex, Transactional transactional) {
+  static boolean rollbackOn(Throwable ex, Transactional transactional) {
     boolean rollback = false;
     boolean hasWin = false;
     int deepest = Integer.MAX_VALUE;
@@ -101,12 +101,11 @@ public class TransactionalAspect {
     }
 
     if (!hasWin) {
+      // default behavior if no rule was found
       rollback = ex instanceof RuntimeException || ex instanceof Error;
     }
     return rollback;
   }
-
-
 
   /*
    * @see org.springframework.transaction.interceptor.RollbackRuleAttribute#getDepth(Throwable)
