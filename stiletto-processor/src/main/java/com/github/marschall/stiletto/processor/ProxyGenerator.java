@@ -118,6 +118,9 @@ public class ProxyGenerator extends AbstractProcessor {
   // @TargetObject
   private TypeMirror targetObjectType;
 
+  // @ReturnValue
+  private TypeMirror returnValueType;
+
   // FIXME should all be type mirrors
   private TypeElement before;
 
@@ -156,6 +159,9 @@ public class ProxyGenerator extends AbstractProcessor {
 
     TypeElement targetObjectElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.TargetObject");
     this.targetObjectType = targetObjectElement.asType();
+
+    TypeElement returnValueElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.ReturnValue");
+    this.returnValueType = returnValueElement.asType();
 
     this.namingStrategy = s -> s + "_";
     this.evaluator = new ExpressionEvaluator();
@@ -505,6 +511,13 @@ public class ProxyGenerator extends AbstractProcessor {
         }
 
         argument = new Argument("this.targetObject");
+      } else if (isSameType(annotationType, this.returnValueType)) { // @ReturnValueType
+        if (argument != null) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + parameter);
+          return argument;
+        }
+
+        argument = new Argument(adviceContext.getJoinPointContext().getReturnVariableName());
       }
     }
 

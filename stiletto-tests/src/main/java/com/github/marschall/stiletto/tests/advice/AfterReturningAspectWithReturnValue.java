@@ -5,7 +5,7 @@ import com.github.marschall.stiletto.api.advice.AfterReturning;
 public class AfterReturningAspectWithReturnValue {
 
   @AfterReturning
-  public Object afterFinally() {
+  public Object afterReturning() {
     return "called";
   }
 
