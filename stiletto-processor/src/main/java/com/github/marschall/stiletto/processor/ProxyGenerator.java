@@ -403,7 +403,12 @@ public class ProxyGenerator extends AbstractProcessor {
               || !afterFinallyMethods.isEmpty()
               || !aroundMethods.isEmpty());
 
-      JoinPointContext joinPointContext = new JoinPointContext(targetClass, method);
+      JoinPointContext joinPointContext;
+      if (needsReturnValue) {
+        joinPointContext = new JoinPointContext(targetClass, method, "returnValue");
+      } else {
+        joinPointContext = new JoinPointContext(targetClass, method);
+      }
 
       com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
 
@@ -414,13 +419,19 @@ public class ProxyGenerator extends AbstractProcessor {
       }
 
       if (needsReturnValue) {
-        methodBuilder.addStatement("$T returnValue = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReturnType());
+        methodBuilder.addStatement("$T " + joinPointContext.getReturnVariableName()
+          + " = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReturnType());
       }
 
-      // add after methods
+
+      for (ExecutableElement afterReturningMethod : afterReturningMethods) {
+        AdviceContext adviceContext = new AdviceContext(afterReturningMethod, joinPointContext);
+        Statement adviceCall = buildAdviceCall(adviceContext);
+        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
+      }
 
       if (needsReturnValue) {
-        methodBuilder.addStatement("return returnValue");
+        methodBuilder.addStatement("return " + joinPointContext.getReturnVariableName());
       } else if (isVoid) {
         methodBuilder.addStatement(buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
       } else {
@@ -767,10 +778,16 @@ public class ProxyGenerator extends AbstractProcessor {
 
     private final TypeElement targetClassElement;
     private final ExecutableElement joinpointElement;
+    private final String returnVariableName;
 
     JoinPointContext(TypeElement targetClassElement, ExecutableElement joinpointElement) {
+      this(targetClassElement, joinpointElement, null);
+    }
+
+    JoinPointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, String returnVariableName) {
       this.targetClassElement = targetClassElement;
       this.joinpointElement = joinpointElement;
+      this.returnVariableName = returnVariableName;
     }
 
     TypeElement getTargetClassElement() {
@@ -781,12 +798,11 @@ public class ProxyGenerator extends AbstractProcessor {
       return this.joinpointElement;
     }
 
-    boolean needsReturnVariable() {
-      return false;
-    }
-
     String getReturnVariableName() {
-      throw new IllegalStateException("not yet implemented");
+      if (this.returnVariableName == null) {
+        throw new IllegalStateException("no return variable present");
+      }
+      return this.returnVariableName;
     }
 
     boolean needsExectionTimeMillis() {

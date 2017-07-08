@@ -1,6 +1,7 @@
 package com.github.marschall.stiletto.tests.advice;
 
 import com.github.marschall.stiletto.api.advice.AfterReturning;
+import com.github.marschall.stiletto.api.advice.AfterThrowing;
 
 public class AfterThrowingAspect {
 
@@ -10,8 +11,8 @@ public class AfterThrowingAspect {
     this.invocationCount = 0;
   }
 
-  @AfterReturning
-  public void afterFinally() {
+  @AfterThrowing
+  public void afterThrowing() {
     this.invocationCount += 1;
   }
 

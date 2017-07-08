@@ -11,7 +11,7 @@ public class AfterReturningAspect {
   }
 
   @AfterReturning
-  public void afterFinally() {
+  public void afterReturning() {
     this.invocationCount += 1;
   }
 
