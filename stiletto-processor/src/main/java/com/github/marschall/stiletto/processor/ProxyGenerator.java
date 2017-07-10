@@ -8,9 +8,8 @@ import static com.github.marschall.stiletto.processor.AptUtils.asTypeElement;
 import static com.github.marschall.stiletto.processor.AptUtils.asTypeMirror;
 import static com.github.marschall.stiletto.processor.AptUtils.getNonPrivateConstrctors;
 import static com.github.marschall.stiletto.processor.AptUtils.getQualifiedName;
-import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
-import static com.github.marschall.stiletto.processor.AptUtils.containsAnyNonVoid;
 import static com.github.marschall.stiletto.processor.AptUtils.getSignature;
+import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
@@ -60,8 +59,6 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 
-import com.github.marschall.stiletto.processor.ProxyGenerator.JoinPointContext;
-import com.github.marschall.stiletto.processor.ProxyGenerator.AdviceContext;
 import com.github.marschall.stiletto.processor.el.JoinPoint;
 import com.github.marschall.stiletto.processor.el.TargetClass;
 import com.squareup.javapoet.AnnotationSpec;
@@ -121,6 +118,9 @@ public class ProxyGenerator extends AbstractProcessor {
   // @ReturnValue
   private TypeMirror returnValueType;
 
+  // @Arguments
+  private TypeMirror argumentsType;
+
   // FIXME should all be type mirrors
   private TypeElement before;
 
@@ -162,6 +162,9 @@ public class ProxyGenerator extends AbstractProcessor {
 
     TypeElement returnValueElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.ReturnValue");
     this.returnValueType = returnValueElement.asType();
+
+    TypeElement argumentsElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Arguments");
+    this.argumentsType = argumentsElement.asType();
 
     this.namingStrategy = s -> s + "_";
     this.evaluator = new ExpressionEvaluator();
@@ -489,13 +492,13 @@ public class ProxyGenerator extends AbstractProcessor {
     return new Statement(buffer.toString(), arguments);
   }
 
-  private Argument buildAdviceCallArgument(VariableElement parameter, AdviceContext adviceContext) {
+  private Argument buildAdviceCallArgument(VariableElement adviceParameter, AdviceContext adviceContext) {
     Argument argument = null;
-    for (AnnotationMirror mirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(parameter)) {
+    for (AnnotationMirror mirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(adviceParameter)) {
       DeclaredType annotationType = mirror.getAnnotationType();
       if (isSameType(annotationType, this.evaluateType)) { // @Evaluate
         if (argument != null) {
-          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + parameter);
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
 
@@ -506,14 +509,42 @@ public class ProxyGenerator extends AbstractProcessor {
         argument = new Argument("$S", evaluate(expression, joinPointContext.getTargetClassElement(), joinPointContext.getJoinpointElement()));
       } else if (isSameType(annotationType, this.targetObjectType)) { // @TargetObject
         if (argument != null) {
-          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + parameter);
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
 
         argument = new Argument("this.targetObject");
-      } else if (isSameType(annotationType, this.returnValueType)) { // @ReturnValueType
+      } else if (isSameType(annotationType, this.argumentsType)) { // @Arguments
         if (argument != null) {
-          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + parameter);
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
+          return argument;
+        }
+
+        List<? extends VariableElement> parameters = adviceContext.getJoinPointContext().getJoinpointElement().getParameters();
+        if (parameters.isEmpty()) {
+          // consistent with InvocationHandler
+          argument = new Argument("null");
+        } else {
+          StringBuilder buffer = new StringBuilder();
+          buffer.append("new Object[]{");
+          boolean first = true;
+          for (VariableElement joinpointParameter : parameters) {
+            if (!first) {
+              buffer.append(", ");
+            }
+            first = false;
+            buffer.append(joinpointParameter.getSimpleName());
+          }
+          buffer.append("}");
+          argument = new Argument(buffer.toString());
+        }
+      } else if (isSameType(annotationType, this.returnValueType)) { // @ReturnValue
+        if (argument != null) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
+          return argument;
+        }
+        if (hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturning)) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ReturnValue is only available for @afterReturning");
           return argument;
         }
 
@@ -522,9 +553,19 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     if (argument == null) {
-      this.processingEnv.getMessager().printMessage(Kind.ERROR, "no injection annotation present on: " + parameter);
+      this.processingEnv.getMessager().printMessage(Kind.ERROR, "no injection annotation present on: " + adviceParameter);
     }
     return argument;
+  }
+
+  private boolean hasAnnotationMirror(ExecutableElement adviceMethod, TypeElement typeElement) {
+    for (AnnotationMirror mirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(typeElement)) {
+      TypeMirror expectedAnnotationType = typeElement.asType();
+      if (this.processingEnv.getTypeUtils().isSameType(mirror.getAnnotationType(), expectedAnnotationType)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static final class Argument {

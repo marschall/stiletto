@@ -14,4 +14,7 @@ public @interface AfterThrowing {
 
   // TODO default Exception?
   Class<? extends Throwable>[] values() default Throwable.class;
+
+  boolean onDeclared() default false;
+
 }
