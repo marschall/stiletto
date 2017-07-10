@@ -27,6 +27,13 @@ import com.github.marschall.stiletto.api.invocation.ActualMethodCallWithoutResul
 
 /**
  * Reimplementation of {@link org.springframework.cache.interceptor.CacheInterceptor}.
+ *
+ * <h2>No Supported</h2>
+ * The following features of Spring caching are currently not supported:
+ * <ul>
+ *  <li>specifying {@link CacheResolver}, currently only the cache names are used</li>
+ *  <li>conditional caching</li>
+ * </ul>
  */
 public class CacheableAspect {
 
@@ -38,14 +45,12 @@ public class CacheableAspect {
 
   private final KeyGenerator keyGenerator;
   private final CacheManager cacheManager;
-  private final CacheResolver cacheResolver;
   private final CacheErrorHandler errorHandler;
   private final String[] cacheNames;
 
-  public CacheableAspect(KeyGenerator keyGenerator, CacheManager cacheManager, CacheResolver cacheResolver, CacheErrorHandler errorHandler, String... cacheNames) {
+  public CacheableAspect(KeyGenerator keyGenerator, CacheManager cacheManager, CacheErrorHandler errorHandler, String... cacheNames) {
     this.keyGenerator = keyGenerator;
     this.cacheManager = cacheManager;
-    this.cacheResolver = cacheResolver;
     this.errorHandler = errorHandler;
     this.cacheNames = cacheNames;
   }
@@ -53,7 +58,13 @@ public class CacheableAspect {
   @Around
   @Cacheable
   @WithAnnotationMatching(Cacheable.class)
-  public void invoke(@DeclaredAnnotation Cacheable cacheable, @MethodCall ActualMethodCallWithoutResult call) {
+  public void invoke(@DeclaredAnnotation Cacheable cacheable,
+          @DeclaredAnnotation Optional<CacheConfig> cacheConfig,
+          @TargetObject Object targetObject,
+          @Joinpoint Method method,
+          @Arguments Object[] arguments,
+          @ReturnValue Object value,
+          @MethodCall ActualMethodCallWithoutResult call) {
 
   }
 
@@ -153,8 +164,7 @@ public class CacheableAspect {
   private String[] getCacheNames(CachePut cachePut, Optional<CacheConfig> cacheConfig) {
     String[] names = this.computeCacheNames(cachePut, cacheConfig);
     if (names.length == 0) {
-      // org.springframework.cache.interceptor.CacheAspectSupport.getCaches(CacheOperationInvocationContext<CacheOperation>, CacheResolver)
-      throw new IllegalStateException("No cache could be resolved. At least one cache should be provided per cache operation.");
+      throw noCacheNameSpecified();
     }
     return names;
   }
@@ -175,11 +185,34 @@ public class CacheableAspect {
     return EMPTY;
   }
 
+  private String[] getCacheNames(Cacheable cacheable, Optional<CacheConfig> cacheConfig) {
+    String[] names = this.computeCacheNames(cacheable, cacheConfig);
+    if (names.length == 0) {
+      throw noCacheNameSpecified();
+    }
+    return names;
+  }
+
+  private String[] computeCacheNames(Cacheable cacheable, Optional<CacheConfig> cacheConfig) {
+    if (this.cacheNames.length != 0) {
+      return this.cacheNames;
+    }
+    if (cacheable.cacheNames().length != 0) {
+      return cacheable.cacheNames();
+    }
+    if (cacheable.value().length != 0) {
+      return cacheable.value();
+    }
+    if (cacheConfig.isPresent()) {
+      return cacheConfig.get().cacheNames();
+    }
+    return EMPTY;
+  }
+
   private String[] getCacheNames(CacheEvict cacheEvict, Optional<CacheConfig> cacheConfig) {
     String[] names = this.computeCacheNames(cacheEvict, cacheConfig);
     if (names.length == 0) {
-      // org.springframework.cache.interceptor.CacheAspectSupport.getCaches(CacheOperationInvocationContext<CacheOperation>, CacheResolver)
-      throw new IllegalStateException("No cache could be resolved. At least one cache should be provided per cache operation.");
+      throw noCacheNameSpecified();
     }
     return names;
   }
@@ -198,6 +231,11 @@ public class CacheableAspect {
       return cacheConfig.get().cacheNames();
     }
     return EMPTY;
+  }
+
+  private IllegalStateException noCacheNameSpecified() {
+    // org.springframework.cache.interceptor.CacheAspectSupport.getCaches(CacheOperationInvocationContext<CacheOperation>, CacheResolver)
+    return new IllegalStateException("No cache could be resolved. At least one cache should be provided per cache operation.");
   }
 
 }

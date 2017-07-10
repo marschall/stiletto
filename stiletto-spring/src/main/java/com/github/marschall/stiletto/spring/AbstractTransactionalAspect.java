@@ -105,7 +105,7 @@ abstract class AbstractTransactionalAspect {
     boolean win = false;
     for (String pattern : patterns) {
       int depth = getMatchDepth(throwable, pattern);
-      if (depth > 0) {
+      if (depth >= 0) {
         win = true;
         deepest = Math.min(deepest, depth);
       }
