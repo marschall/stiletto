@@ -13,6 +13,10 @@ public class CaptureArguments {
     return "oneArgument";
   }
 
+  public String twoArguments(String s1, String s2) {
+    return "twoArguments";
+  }
+
   public String onePrimitiveArgument(int i) {
     return "onePrimitiveArgument";
   }

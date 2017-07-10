@@ -5,7 +5,7 @@ import static org.junit.Assert.assertSame;
 import org.junit.Before;
 import org.junit.Test;
 
-public class TargetObjectInterfaceTest {
+public class TargetObjectTest {
 
   private TargetObjectAspect aspect;
 

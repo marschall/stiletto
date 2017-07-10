@@ -4,7 +4,7 @@ import static org.junit.Assert.*;
 
 import org.junit.Test;
 
-public class InjectReturnValueTest {
+public class ReturnValueTest {
 
   @Test
   public void noArgument() {
