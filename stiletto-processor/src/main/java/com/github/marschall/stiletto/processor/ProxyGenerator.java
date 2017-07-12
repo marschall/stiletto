@@ -496,48 +496,29 @@ public class ProxyGenerator extends AbstractProcessor {
     Argument argument = null;
     for (AnnotationMirror mirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(adviceParameter)) {
       DeclaredType annotationType = mirror.getAnnotationType();
+      // unfortunately due to javax.lang.model.type.TypeMirror.equals(Object)
+      // we can not use a map here
       if (isSameType(annotationType, this.evaluateType)) { // @Evaluate
         if (argument != null) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
 
-        AnnotationValue annotationValue = mirror.getElementValues().get(evaluateValueMethod);
-        String expression = asString(annotationValue);
-
-        JoinPointContext joinPointContext = adviceContext.getJoinPointContext();
-        argument = new Argument("$S", evaluate(expression, joinPointContext.getTargetClassElement(), joinPointContext.getJoinpointElement()));
+        argument = buildEvaluateArgument(adviceContext, mirror);
       } else if (isSameType(annotationType, this.targetObjectType)) { // @TargetObject
         if (argument != null) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
 
-        argument = new Argument("this.targetObject");
+        argument = buildTargetObjectArgument();
       } else if (isSameType(annotationType, this.argumentsType)) { // @Arguments
         if (argument != null) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
 
-        List<? extends VariableElement> parameters = adviceContext.getJoinPointContext().getJoinpointElement().getParameters();
-        if (parameters.isEmpty()) {
-          // consistent with InvocationHandler
-          argument = new Argument("null");
-        } else {
-          StringBuilder buffer = new StringBuilder();
-          buffer.append("new Object[]{");
-          boolean first = true;
-          for (VariableElement joinpointParameter : parameters) {
-            if (!first) {
-              buffer.append(", ");
-            }
-            first = false;
-            buffer.append(joinpointParameter.getSimpleName());
-          }
-          buffer.append("}");
-          argument = new Argument(buffer.toString());
-        }
+        argument = buildArgumentsArgument(adviceContext);
       } else if (isSameType(annotationType, this.returnValueType)) { // @ReturnValue
         if (argument != null) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
@@ -548,7 +529,7 @@ public class ProxyGenerator extends AbstractProcessor {
           return argument;
         }
 
-        argument = new Argument(adviceContext.getJoinPointContext().getReturnVariableName());
+        argument = buildReturnValueArgument(adviceContext);
       }
     }
 
@@ -556,6 +537,43 @@ public class ProxyGenerator extends AbstractProcessor {
       this.processingEnv.getMessager().printMessage(Kind.ERROR, "no injection annotation present on: " + adviceParameter);
     }
     return argument;
+  }
+
+  private Argument buildReturnValueArgument(AdviceContext adviceContext) {
+    return new Argument(adviceContext.getJoinPointContext().getReturnVariableName());
+  }
+
+  private Argument buildArgumentsArgument(AdviceContext adviceContext) {
+    List<? extends VariableElement> parameters = adviceContext.getJoinPointContext().getJoinpointElement().getParameters();
+    if (parameters.isEmpty()) {
+      // consistent with InvocationHandler
+      return new Argument("null");
+    } else {
+      StringBuilder buffer = new StringBuilder();
+      buffer.append("new Object[]{");
+      boolean first = true;
+      for (VariableElement joinpointParameter : parameters) {
+        if (!first) {
+          buffer.append(", ");
+        }
+        first = false;
+        buffer.append(joinpointParameter.getSimpleName());
+      }
+      buffer.append("}");
+      return new Argument(buffer.toString());
+    }
+  }
+
+  private Argument buildTargetObjectArgument() {
+    return new Argument("this.targetObject");
+  }
+
+  private Argument buildEvaluateArgument(AdviceContext adviceContext, AnnotationMirror mirror) {
+    AnnotationValue annotationValue = mirror.getElementValues().get(evaluateValueMethod);
+    String expression = asString(annotationValue);
+    JoinPointContext joinPointContext = adviceContext.getJoinPointContext();
+
+    return new Argument("$S", evaluate(expression, joinPointContext.getTargetClassElement(), joinPointContext.getJoinpointElement()));
   }
 
   private boolean hasAnnotationMirror(ExecutableElement adviceMethod, TypeElement typeElement) {
