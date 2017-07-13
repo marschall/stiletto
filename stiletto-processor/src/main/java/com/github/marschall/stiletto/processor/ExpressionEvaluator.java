@@ -14,12 +14,12 @@ import javax.el.FunctionMapper;
 import javax.el.ValueExpression;
 import javax.el.VariableMapper;
 
-import com.github.marschall.stiletto.processor.el.JoinPoint;
+import com.github.marschall.stiletto.processor.el.Joinpoint;
 import com.github.marschall.stiletto.processor.el.TargetClass;
 
 final class ExpressionEvaluator {
 
-  String evaluate(String expression, TargetClass targetClass, JoinPoint joinPoint) {
+  String evaluate(String expression, TargetClass targetClass, Joinpoint joinPoint) {
     Thread currentThread = Thread.currentThread();
     ClassLoader oldTccl = currentThread.getContextClassLoader();
     currentThread.setContextClassLoader(ExpressionEvaluator.class.getClassLoader());
@@ -33,7 +33,7 @@ final class ExpressionEvaluator {
     }
   }
 
-  String evaluateWithTccl(String expression, TargetClass targetClass, JoinPoint joinPoint) {
+  String evaluateWithTccl(String expression, TargetClass targetClass, Joinpoint joinPoint) {
     // http://illegalargumentexception.blogspot.ch/2008/04/java-using-el-outside-j2ee.html
     // https://docs.oracle.com/javaee/7/api/javax/el/ELProcessor.html
 
@@ -47,7 +47,7 @@ final class ExpressionEvaluator {
 
     VariableMapper variableMapper = new SimpleVariableMapper();
     variableMapper.setVariable("targetClass", expressionFactory.createValueExpression(targetClass, TargetClass.class));
-    variableMapper.setVariable("joinpoint", expressionFactory.createValueExpression(joinPoint, JoinPoint.class));
+    variableMapper.setVariable("joinpoint", expressionFactory.createValueExpression(joinPoint, Joinpoint.class));
     FunctionMapper functionMapper = new SimpleFunctionMapper();
 
     ELContext context = new SimpleELContext(new BeanELResolver(), functionMapper, variableMapper);
