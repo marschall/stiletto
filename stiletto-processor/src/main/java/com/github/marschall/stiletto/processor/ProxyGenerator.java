@@ -23,12 +23,13 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -121,6 +122,9 @@ public class ProxyGenerator extends AbstractProcessor {
   // @Arguments
   private TypeMirror argumentsType;
 
+  // @Joinpoint
+  private TypeMirror joinpointType;
+
   // FIXME should all be type mirrors
   private TypeElement before;
 
@@ -165,6 +169,9 @@ public class ProxyGenerator extends AbstractProcessor {
 
     TypeElement argumentsElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Arguments");
     this.argumentsType = argumentsElement.asType();
+
+    TypeElement joinpointElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Joinpoint");
+    this.joinpointType = joinpointElement.asType();
 
     this.namingStrategy = s -> s + "_";
     this.evaluator = new ExpressionEvaluator();
@@ -320,25 +327,106 @@ public class ProxyGenerator extends AbstractProcessor {
     }
   }
 
-  private void generateProxy(ProxyToGenerate aspectToGenerate) throws IOException {
-    TypeElement targetClass = aspectToGenerate.getTargetClassElement();
+  private void generateProxy(ProxyToGenerate proxyToGenerate) throws IOException {
+    TypeElement targetClass = proxyToGenerate.getTargetClassElement();
     String proxyClassName = buildClassName(targetClass);
     String packageName = getPackageName(targetClass);
 
     FieldSpec targetObjectField = FieldSpec.builder(TypeName.get(targetClass.asType()), "targetObject", PRIVATE, FINAL)
             .build();
-    FieldSpec aspectField = FieldSpec.builder(TypeName.get(aspectToGenerate.getAspect()), "aspect", PRIVATE, FINAL)
+    FieldSpec aspectField = FieldSpec.builder(TypeName.get(proxyToGenerate.getAspect()), "aspect", PRIVATE, FINAL)
             .build();
 
     Builder proxyClassBilder = TypeSpec.classBuilder(proxyClassName)
             .addModifiers(PUBLIC, FINAL)
-            .addJavadoc("Proxy class for {@link $T} being advised by {@link $T}.\n",
-                    TypeName.get(targetClass.asType()),
-                    TypeName.get(aspectToGenerate.getAspect()))
             .addOriginatingElement(targetClass)
             .addField(targetObjectField)
             .addField(aspectField);
 
+    addSuperType(proxyToGenerate, proxyClassBilder);
+
+    addClassHeader(proxyToGenerate, proxyClassBilder);
+
+    addConstructors(proxyToGenerate, proxyClassBilder);
+
+    TargetObjectContext targetObjectContext = new TargetObjectContext();
+    List<MethodConstant> methodConstants = new ArrayList<>();
+    for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
+      // TODO
+      Element apectElement = this.processingEnv.getTypeUtils().asElement(proxyToGenerate.getAspect());
+      TypeElement aspectType = asTypeElement(apectElement);
+
+      List<ExecutableElement> afterReturningMethods = getAfterReturningMethods(aspectType);
+      List<ExecutableElement> afterFinallyMethods = getAfterFinallyMethods(aspectType);
+      List<ExecutableElement> aroundMethods = getAroundMethods(aspectType);
+      List<ExecutableElement> beforeMethods = getBeforeMethods(aspectType);
+      boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
+      boolean needsReturnValue = !isVoid
+              && (!afterReturningMethods.isEmpty()
+                      || !afterFinallyMethods.isEmpty()
+                      || !aroundMethods.isEmpty());
+
+      JoinPointContext joinPointContext;
+      if (needsReturnValue) {
+        joinPointContext = new JoinPointContext(targetClass, method, targetObjectContext, "returnValue");
+      } else {
+        joinPointContext = new JoinPointContext(targetClass, method, targetObjectContext);
+      }
+
+      com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
+
+      for (ExecutableElement beforeMethod : beforeMethods) {
+        AdviceContext adviceContext = new AdviceContext(beforeMethod, joinPointContext);
+        Statement adviceCall = buildAdviceCall(adviceContext);
+        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
+      }
+
+      if (needsReturnValue) {
+        methodBuilder.addStatement("$T " + joinPointContext.getReturnVariableName()
+        + " = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReturnType());
+      }
+
+
+      for (ExecutableElement afterReturningMethod : afterReturningMethods) {
+        AdviceContext adviceContext = new AdviceContext(afterReturningMethod, joinPointContext);
+        Statement adviceCall = buildAdviceCall(adviceContext);
+        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
+      }
+
+      if (needsReturnValue) {
+        methodBuilder.addStatement("return " + joinPointContext.getReturnVariableName());
+      } else if (isVoid) {
+        methodBuilder.addStatement(buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
+      } else {
+        methodBuilder.addStatement("return " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
+      }
+
+      proxyClassBilder.addMethod(methodBuilder.build());
+
+      if (joinPointContext.hasMethodConstantName()) {
+        methodConstants.add(new MethodConstant(joinPointContext.getMethodConstantName(), method));
+      }
+    }
+
+    addMethodConstants(proxyClassBilder, methodConstants);
+
+    TypeSpec proxyClass = proxyClassBilder.build();
+
+    JavaFile javaFile = JavaFile.builder(packageName, proxyClass)
+            .build();
+
+
+    Filer filer = this.processingEnv.getFiler();
+    String fullyQualified = getFullyQualifiedProxyClassName(packageName, proxyClassName);
+    JavaFileObject javaFileObject = filer.createSourceFile(fullyQualified, targetClass);
+    try (Writer writer = javaFileObject.openWriter()) {
+      javaFile.writeTo(writer);
+    }
+
+  }
+
+  private void addSuperType(ProxyToGenerate proxyToGenerate, Builder proxyClassBilder) {
+    TypeElement targetClass = proxyToGenerate.getTargetClassElement();
     if (targetClass.getKind() == ElementKind.INTERFACE) {
       proxyClassBilder.addSuperinterface(TypeName.get(targetClass.asType()));
       List<? extends TypeParameterElement> typeParameters = targetClass.getTypeParameters();
@@ -362,19 +450,28 @@ public class ProxyGenerator extends AbstractProcessor {
         }
       }
     }
+  }
 
+  private void addClassHeader(ProxyToGenerate proxyToGenerate, Builder proxyClassBilder) {
+    TypeElement targetClass = proxyToGenerate.getTargetClassElement();
+    proxyClassBilder.addJavadoc("Proxy class for {@link $T} being advised by {@link $T}.\n",
+            TypeName.get(targetClass.asType()),
+            TypeName.get(proxyToGenerate.getAspect()));
     if (this.addGenerated) {
       proxyClassBilder.addAnnotation(AnnotationSpec.builder(ClassName.get("javax.annotation", "Generated"))
               .addMember("value", "$S", this.getClass().getName())
               .build());
     }
+  }
 
+  private void addConstructors(ProxyToGenerate proxyToGenerate, Builder proxyClassBilder) {
+    TypeElement targetClass = proxyToGenerate.getTargetClassElement();
     List<ExecutableElement> nonPrivateConstrctors = getNonPrivateConstrctors(targetClass);
     if (nonPrivateConstrctors.isEmpty()) {
       proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
               .addModifiers(PUBLIC)
               .addParameter(TypeName.get(targetClass.asType()), "targetObject")
-              .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+              .addParameter(TypeName.get(proxyToGenerate.getAspect()), "aspect")
               .addStatement("$T.requireNonNull(targetObject, $S)", Objects.class, "targetObject")
               .addStatement("this.targetObject = targetObject")
               .addStatement("$T.requireNonNull(aspect, $S)", Objects.class, "aspect")
@@ -386,7 +483,7 @@ public class ProxyGenerator extends AbstractProcessor {
                 .addModifiers(PUBLIC)
                 .addParameters(getParameters(constrctor))
                 .addParameter(TypeName.get(targetClass.asType()), "targetObject")
-                .addParameter(TypeName.get(aspectToGenerate.getAspect()), "aspect")
+                .addParameter(TypeName.get(proxyToGenerate.getAspect()), "aspect")
                 // add super call even for default constructor in oder to aid debugging
                 .addStatement(buildSuperCall(constrctor))
                 .addStatement("$T.requireNonNull(targetObject, $S)", Objects.class, "targetObject")
@@ -396,72 +493,22 @@ public class ProxyGenerator extends AbstractProcessor {
                 .build());
       }
     }
+  }
 
-    for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
-      // TODO
-      Element apectElement = this.processingEnv.getTypeUtils().asElement(aspectToGenerate.getAspect());
-      TypeElement aspectType = asTypeElement(apectElement);
-
-      List<ExecutableElement> afterReturningMethods = getAfterReturningMethods(aspectType);
-      List<ExecutableElement> afterFinallyMethods = getAfterFinallyMethods(aspectType);
-      List<ExecutableElement> aroundMethods = getAroundMethods(aspectType);
-      List<ExecutableElement> beforeMethods = getBeforeMethods(aspectType);
-      boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
-      boolean needsReturnValue = !isVoid
-              && (!afterReturningMethods.isEmpty()
-              || !afterFinallyMethods.isEmpty()
-              || !aroundMethods.isEmpty());
-
-      JoinPointContext joinPointContext;
-      if (needsReturnValue) {
-        joinPointContext = new JoinPointContext(targetClass, method, "returnValue");
-      } else {
-        joinPointContext = new JoinPointContext(targetClass, method);
-      }
-
-      com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
-
-      for (ExecutableElement beforeMethod : beforeMethods) {
-        AdviceContext adviceContext = new AdviceContext(beforeMethod, joinPointContext);
-        Statement adviceCall = buildAdviceCall(adviceContext);
-        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
-      }
-
-      if (needsReturnValue) {
-        methodBuilder.addStatement("$T " + joinPointContext.getReturnVariableName()
-          + " = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReturnType());
-      }
-
-
-      for (ExecutableElement afterReturningMethod : afterReturningMethods) {
-        AdviceContext adviceContext = new AdviceContext(afterReturningMethod, joinPointContext);
-        Statement adviceCall = buildAdviceCall(adviceContext);
-        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
-      }
-
-      if (needsReturnValue) {
-        methodBuilder.addStatement("return " + joinPointContext.getReturnVariableName());
-      } else if (isVoid) {
-        methodBuilder.addStatement(buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
-      } else {
-        methodBuilder.addStatement("return " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
-      }
-
-      proxyClassBilder.addMethod(methodBuilder.build());
+  private void addMethodConstants(Builder proxyClassBilder, List<MethodConstant> methodConstants) {
+    if (methodConstants.isEmpty()) {
+      return;
     }
 
-    TypeSpec proxyClass = proxyClassBilder.build();
+    com.squareup.javapoet.MethodSpec.Builder builder = MethodSpec.methodBuilder("<cinit>")
+      .addModifiers(STATIC);
 
-    JavaFile javaFile = JavaFile.builder(packageName, proxyClass)
-            .build();
-
-
-    Filer filer = this.processingEnv.getFiler();
-    String fullyQualified = getFullyQualifiedProxyClassName(packageName, proxyClassName);
-    JavaFileObject javaFileObject = filer.createSourceFile(fullyQualified, targetClass);
-    try (Writer writer = javaFileObject.openWriter()) {
-      javaFile.writeTo(writer);
+    for (MethodConstant methodConstant : methodConstants) {
+      proxyClassBilder.addField(java.lang.reflect.Method.class, methodConstant.getName(), STATIC);
+//      addMethodConstant(builder, me);
     }
+
+    proxyClassBilder.addMethod(builder.build());
 
   }
 
@@ -472,22 +519,22 @@ public class ProxyGenerator extends AbstractProcessor {
     buffer.append("this.aspect.");
     buffer.append(adviceMethod.getSimpleName());
     buffer.append('(');
-        boolean first = true;
-        for (VariableElement parameter: adviceMethod.getParameters()) {
-          if (!first) {
-            buffer.append(", ");
-          }
-          first = false;
-          Argument argument = buildAdviceCallArgument(parameter, adviceContext);
-          if (argument != null) {
-            buffer.append(argument.getValue());
-            Object formatParameter = argument.getFormatParameter();
-            if (formatParameter != null) {
-              arguments.add(formatParameter);
-            }
-          }
-
+    boolean first = true;
+    for (VariableElement parameter: adviceMethod.getParameters()) {
+      if (!first) {
+        buffer.append(", ");
+      }
+      first = false;
+      Argument argument = buildAdviceCallArgument(parameter, adviceContext);
+      if (argument != null) {
+        buffer.append(argument.getValue());
+        Object formatParameter = argument.getFormatParameter();
+        if (formatParameter != null) {
+          arguments.add(formatParameter);
         }
+      }
+
+    }
     buffer.append(')');
     return new Statement(buffer.toString(), arguments);
   }
@@ -584,6 +631,26 @@ public class ProxyGenerator extends AbstractProcessor {
       }
     }
     return false;
+  }
+
+  static final class MethodConstant {
+
+    private final String name;
+    private final ExecutableElement method;
+
+    MethodConstant(String name, ExecutableElement method) {
+      this.name = name;
+      this.method = method;
+    }
+
+    String getName() {
+      return this.name;
+    }
+
+    ExecutableElement getMethod() {
+      return this.method;
+    }
+
   }
 
   static final class Argument {
@@ -707,10 +774,10 @@ public class ProxyGenerator extends AbstractProcessor {
       if (element.getKind() == ElementKind.METHOD && isOverriable(element)) {
         if (element.getEnclosingElement().getKind() != ElementKind.INTERFACE) {
           // TODO check if method overrides any interface method
-//          ExecutableElement interfaceMethod = null;
-//          if (!this.processingEnv.getElementUtils().overrides((ExecutableElement) element, interfaceMethod, typeElement)) {
-//            return false;
-//          }
+          //          ExecutableElement interfaceMethod = null;
+          //          if (!this.processingEnv.getElementUtils().overrides((ExecutableElement) element, interfaceMethod, typeElement)) {
+          //            return false;
+          //          }
         }
       }
     }
@@ -721,9 +788,12 @@ public class ProxyGenerator extends AbstractProcessor {
   // generic JavaPoet stuff
 
   private static Iterable<ParameterSpec> getParameters(ExecutableElement executableElement) {
-    return executableElement.getParameters().stream()
-            .map(ParameterSpec::get)
-            .collect(Collectors.toList());
+    List<? extends VariableElement> parameters = executableElement.getParameters();
+    List<ParameterSpec> result = new ArrayList<>();
+    for (VariableElement parameter : parameters) {
+      result.add(ParameterSpec.get(parameter));
+    }
+    return result;
   }
 
   // generic APT stuff
@@ -846,20 +916,58 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
+  static final class TargetObjectContext {
+
+    private Set<String> methodConstants;
+
+    private Map<String, Integer> countsByName;
+
+    TargetObjectContext() {
+      this.methodConstants = new HashSet<>();
+      this.countsByName = new HashMap<>();
+    }
+
+    String generateMethodConstantName(String name) {
+      int existingCount = this.countsByName.getOrDefault(name, 0);
+      String generatedName = "M_" + name + '_' + existingCount;
+      if (!this.methodConstants.add(generatedName)) {
+        throw new IllegalStateException("name " + generatedName + " already present");
+      }
+      this.countsByName.merge(generatedName, 1, (existing, increment) -> existing + increment);
+      return generatedName;
+    }
+
+  }
+
   static final class JoinPointContext {
 
     private final TypeElement targetClassElement;
     private final ExecutableElement joinpointElement;
+    private final TargetObjectContext targetObjectContext;
     private final String returnVariableName;
+    private String methodConstantName;
 
-    JoinPointContext(TypeElement targetClassElement, ExecutableElement joinpointElement) {
-      this(targetClassElement, joinpointElement, null);
+    JoinPointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext) {
+      this(targetClassElement, joinpointElement, targetObjectContext, null);
     }
 
-    JoinPointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, String returnVariableName) {
+    JoinPointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext, String returnVariableName) {
       this.targetClassElement = targetClassElement;
       this.joinpointElement = joinpointElement;
+      this.targetObjectContext = targetObjectContext;
       this.returnVariableName = returnVariableName;
+    }
+
+    String getMethodConstantName() {
+      if (this.methodConstantName == null) {
+        String joinpointMethodName = this.joinpointElement.getSimpleName().toString();
+        this.methodConstantName = this.targetObjectContext.generateMethodConstantName(joinpointMethodName);
+      }
+      return this.methodConstantName;
+    }
+
+    boolean hasMethodConstantName() {
+      return this.methodConstantName != null;
     }
 
     TypeElement getTargetClassElement() {
