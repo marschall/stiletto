@@ -1,15 +1,5 @@
 package com.github.marschall.stiletto.processor;
 
-import static com.github.marschall.stiletto.processor.AptUtils.asAnnotationMirror;
-import static com.github.marschall.stiletto.processor.AptUtils.asAnnotationValues;
-import static com.github.marschall.stiletto.processor.AptUtils.asDeclaredType;
-import static com.github.marschall.stiletto.processor.AptUtils.asString;
-import static com.github.marschall.stiletto.processor.AptUtils.asTypeElement;
-import static com.github.marschall.stiletto.processor.AptUtils.asTypeMirror;
-import static com.github.marschall.stiletto.processor.AptUtils.getNonPrivateConstrctors;
-import static com.github.marschall.stiletto.processor.AptUtils.getQualifiedName;
-import static com.github.marschall.stiletto.processor.AptUtils.getSignature;
-import static com.github.marschall.stiletto.processor.AptUtils.getSimpleName;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY;
 import static com.github.marschall.stiletto.processor.ProxyGenerator.ADVISE_BY_ALL;
 import static javax.lang.model.SourceVersion.RELEASE_8;
@@ -139,23 +129,29 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private ExpressionEvaluator evaluator;
 
+  private AptUtils aptUtils;
+
+  private Elements elements;
+
+  private Types types;
+
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
     this.processingEnv = processingEnv;
     this.addGenerated = true;
 
-    Elements elementUtils = this.processingEnv.getElementUtils();
-    Types typeUtils = this.processingEnv.getTypeUtils();
-    TypeElement adviseBy = elementUtils.getTypeElement(ADVISE_BY);
-    this.before = elementUtils.getTypeElement(BEFORE);
-    this.around = elementUtils.getTypeElement(AROUND);
-    this.afterThrowing = elementUtils.getTypeElement(AFTER_THROWING);
-    this.afterReturning = elementUtils.getTypeElement(AFTER_RETURNING);
-    this.afterFinally = elementUtils.getTypeElement(AFTER_FINALLY);
+    this.elements = this.processingEnv.getElementUtils();
+    this.types = this.processingEnv.getTypeUtils();
+    TypeElement adviseBy = this.elements.getTypeElement(ADVISE_BY);
+    this.before = this.elements.getTypeElement(BEFORE);
+    this.around = this.elements.getTypeElement(AROUND);
+    this.afterThrowing = this.elements.getTypeElement(AFTER_THROWING);
+    this.afterReturning = this.elements.getTypeElement(AFTER_RETURNING);
+    this.afterFinally = this.elements.getTypeElement(AFTER_FINALLY);
     this.adviseByValueMethod = getValueMethod(adviseBy);
-    this.intType = typeUtils.getPrimitiveType(TypeKind.INT);
-    this.longType = typeUtils.getPrimitiveType(TypeKind.LONG);
+    this.intType = types.getPrimitiveType(TypeKind.INT);
+    this.longType = types.getPrimitiveType(TypeKind.LONG);
     this.objectType = this.processingEnv.getElementUtils().getTypeElement("java.lang.Object").asType();
 
     TypeElement evaluateElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Evaluate");
@@ -176,6 +172,8 @@ public class ProxyGenerator extends AbstractProcessor {
 
     this.namingStrategy = s -> s + "_";
     this.evaluator = new ExpressionEvaluator();
+
+    this.aptUtils = new AptUtils(this.types);
   }
 
   @Override
@@ -192,7 +190,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private Set<ProxyToGenerate> extractAspectsToGenerate(RoundEnvironment roundEnv) {
-    TypeElement adviseByAllElement = this.processingEnv.getElementUtils().getTypeElement(ADVISE_BY_ALL);
+    TypeElement adviseByAllElement = this.elements.getTypeElement(ADVISE_BY_ALL);
     ExecutableElement adviseByAllValueMethod = getValueMethod(adviseByAllElement);
 
     // handle @AdviseByAll
@@ -203,8 +201,8 @@ public class ProxyGenerator extends AbstractProcessor {
       }
       for (AnnotationMirror adviseByAll : this.getAnnotationMirrorsOfType(processedClass, adviseByAllElement.asType())) { //@AdviseByAll
         AnnotationValue adviseByAllValue = adviseByAll.getElementValues().get(adviseByAllValueMethod); //@AdviseByAll
-        for (AnnotationValue adviseByValue : asAnnotationValues(adviseByAllValue)) { //@AdviseBy
-          AnnotationMirror adviseByMirror = asAnnotationMirror(adviseByValue); //@AdviseBy
+        for (AnnotationValue adviseByValue : this.aptUtils.asAnnotationValues(adviseByAllValue)) { //@AdviseBy
+          AnnotationMirror adviseByMirror = this.aptUtils.asAnnotationMirror(adviseByValue); //@AdviseBy
           ProxyToGenerate proxyToGenerate = buildProxyToGenerate(processedClass, adviseByMirror);
           toGenerate.add(proxyToGenerate);
         }
@@ -212,7 +210,7 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     // handle @AdviseBy
-    TypeElement adviseByElement = this.processingEnv.getElementUtils().getTypeElement(ADVISE_BY);
+    TypeElement adviseByElement = this.elements.getTypeElement(ADVISE_BY);
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(adviseByElement)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
@@ -228,7 +226,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private List<AnnotationMirror> getAnnotationMirrorsOfType(Element element, TypeMirror type) {
     List<AnnotationMirror> mirrors = new ArrayList<>(1);
-    for (AnnotationMirror annotationMirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(element)) {
+    for (AnnotationMirror annotationMirror : this.elements.getAllAnnotationMirrors(element)) {
       if (this.isSameType(type, annotationMirror.getAnnotationType())) {
         mirrors.add(annotationMirror);
       }
@@ -237,14 +235,14 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private ProxyToGenerate buildProxyToGenerate(Element processedClass, AnnotationMirror adviseByMirror) {
-    String processedClassName = getQualifiedName(processedClass);
+    String processedClassName = this.aptUtils.getQualifiedName(processedClass);
     String aspectClassName = extractAspectClassName(adviseByMirror);
-    TypeElement typeElement = asTypeElement(processedClass);
+    TypeElement typeElement = this.aptUtils.asTypeElement(processedClass);
     return new ProxyToGenerate(processedClassName, aspectClassName, typeElement, extractAspectClassTypeMirror(adviseByMirror));
   }
 
   private boolean validateAnnoatedClass(Element element) {
-    TypeElement typeElement = asTypeElement(element);
+    TypeElement typeElement = this.aptUtils.asTypeElement(element);
     boolean isClass = typeElement.getKind() == ElementKind.CLASS;
     boolean isEnum = typeElement.getKind() == ElementKind.ENUM;
     boolean isTopLevel = typeElement.getNestingKind() == NestingKind.TOP_LEVEL;
@@ -272,7 +270,7 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     // no final non-static methods
-    for (Element member : this.processingEnv.getElementUtils().getAllMembers(typeElement)) {
+    for (Element member : this.elements.getAllMembers(typeElement)) {
       if (member.getKind() == ElementKind.METHOD) {
         Set<Modifier> modifiers = member.getModifiers();
         if (modifiers.contains(FINAL) && !modifiers.contains(STATIC)) {
@@ -312,7 +310,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private List<ExecutableElement> getMethodsToImplement(TypeElement targetClass) {
     List<ExecutableElement> methods = new ArrayList<>();
-    for (Element member : this.processingEnv.getElementUtils().getAllMembers(targetClass)) {
+    for (Element member : this.elements.getAllMembers(targetClass)) {
       member.accept(new ImplementableMethodExtractor(), methods);
     }
     return methods;
@@ -354,8 +352,8 @@ public class ProxyGenerator extends AbstractProcessor {
     List<MethodConstant> methodConstants = new ArrayList<>();
     for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
       // TODO
-      Element apectElement = this.processingEnv.getTypeUtils().asElement(proxyToGenerate.getAspect());
-      TypeElement aspectType = asTypeElement(apectElement);
+      Element apectElement = this.types.asElement(proxyToGenerate.getAspect());
+      TypeElement aspectType = this.aptUtils.asTypeElement(apectElement);
 
       List<ExecutableElement> afterReturningMethods = getAfterReturningMethods(aspectType);
       List<ExecutableElement> afterFinallyMethods = getAfterFinallyMethods(aspectType);
@@ -467,7 +465,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private void addConstructors(ProxyToGenerate proxyToGenerate, Builder proxyClassBilder) {
     TypeElement targetClass = proxyToGenerate.getTargetClassElement();
-    List<ExecutableElement> nonPrivateConstrctors = getNonPrivateConstrctors(targetClass);
+    List<ExecutableElement> nonPrivateConstrctors = this.aptUtils.getNonPrivateConstrctors(targetClass);
     if (nonPrivateConstrctors.isEmpty()) {
       proxyClassBilder.addMethod(MethodSpec.constructorBuilder()
               .addModifiers(PUBLIC)
@@ -505,7 +503,11 @@ public class ProxyGenerator extends AbstractProcessor {
             .beginControlFlow("try");
 
     for (MethodConstant methodConstant : methodConstants) {
-      proxyClassBilder.addField(java.lang.reflect.Method.class, methodConstant.getName(), STATIC);
+      ExecutableElement method = methodConstant.getMethod();
+      proxyClassBilder.addField(FieldSpec.builder(
+              java.lang.reflect.Method.class, methodConstant.getName(), PRIVATE, STATIC, FINAL)
+              .addJavadoc("{@link " + method.getEnclosingElement() + "#" + this.aptUtils.getSignature(method) + "}\n")
+              .build());
       addMethodConstant(initializerBuilder, proxyToGenerate, methodConstant);
     }
 
@@ -532,13 +534,12 @@ public class ProxyGenerator extends AbstractProcessor {
       StringBuilder buffer = new StringBuilder();
       buffer.append("$N = $T.class.getMethod($S, new Class[]{");
       boolean first = true;
-      Types types = this.processingEnv.getTypeUtils();
       for (VariableElement parameter : parameters) {
         if (!first) {
           buffer.append(", ");
         }
         buffer.append("$T.class");
-        formatArguments.add(TypeName.get(types.erasure(parameter.asType())));
+        formatArguments.add(TypeName.get(this.types.erasure(parameter.asType())));
       }
       buffer.append("})");
       initializerBuilder.addStatement(buffer.toString(), formatArguments.toArray());
@@ -574,7 +575,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private Argument buildAdviceCallArgument(VariableElement adviceParameter, AdviceContext adviceContext) {
     Argument argument = null;
-    for (AnnotationMirror mirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(adviceParameter)) {
+    for (AnnotationMirror mirror : this.elements.getAllAnnotationMirrors(adviceParameter)) {
       DeclaredType annotationType = mirror.getAnnotationType();
       // unfortunately due to javax.lang.model.type.TypeMirror.equals(Object)
       // we can not use a map here
@@ -663,16 +664,16 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private Argument buildEvaluateArgument(AdviceContext adviceContext, AnnotationMirror mirror) {
     AnnotationValue annotationValue = mirror.getElementValues().get(evaluateValueMethod);
-    String expression = asString(annotationValue);
+    String expression = this.aptUtils.asString(annotationValue);
     JoinpointContext joinpointContext = adviceContext.getJoinpointContext();
 
     return new Argument("$S", evaluate(expression, joinpointContext.getTargetClassElement(), joinpointContext.getJoinpointElement()));
   }
 
   private boolean hasAnnotationMirror(ExecutableElement adviceMethod, TypeElement typeElement) {
-    for (AnnotationMirror mirror : this.processingEnv.getElementUtils().getAllAnnotationMirrors(typeElement)) {
+    for (AnnotationMirror mirror : this.elements.getAllAnnotationMirrors(typeElement)) {
       TypeMirror expectedAnnotationType = typeElement.asType();
-      if (this.processingEnv.getTypeUtils().isSameType(mirror.getAnnotationType(), expectedAnnotationType)) {
+      if (this.types.isSameType(mirror.getAnnotationType(), expectedAnnotationType)) {
         return true;
       }
     }
@@ -781,7 +782,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private String buildClassName(TypeElement targetClass) {
-    String simpleName = getSimpleName(targetClass);
+    String simpleName = this.aptUtils.getSimpleName(targetClass);
     return this.namingStrategy.deriveClassName(simpleName);
   }
 
@@ -789,14 +790,14 @@ public class ProxyGenerator extends AbstractProcessor {
     // @AdviseBy#value()
     TypeMirror aspectClass = extractAspectClassTypeMirror(adviseBy);
     // @AdviseBy#value() = Aspect.class
-    DeclaredType declaredType = asDeclaredType(aspectClass);
-    return getQualifiedName(declaredType.asElement());
+    DeclaredType declaredType = this.aptUtils.asDeclaredType(aspectClass);
+    return this.aptUtils.getQualifiedName(declaredType.asElement());
   }
 
   private TypeMirror extractAspectClassTypeMirror(AnnotationMirror adviseBy) {
     // @AdviseBy#value()
     AnnotationValue annotationValue = adviseBy.getElementValues().get(this.adviseByValueMethod);
-    return asTypeMirror(annotationValue);
+    return this.aptUtils.asTypeMirror(annotationValue);
   }
 
   private ExecutableElement getValueMethod(TypeElement typeElement) {
@@ -816,7 +817,7 @@ public class ProxyGenerator extends AbstractProcessor {
     if (typeElement.getKind() == ElementKind.INTERFACE) {
       return false;
     }
-    for (Element element : this.processingEnv.getElementUtils().getAllMembers(typeElement)) {
+    for (Element element : this.elements.getAllMembers(typeElement)) {
       if (element.getKind() == ElementKind.METHOD && isOverriable(element)) {
         if (element.getEnclosingElement().getKind() != ElementKind.INTERFACE) {
           // TODO check if method overrides any interface method
@@ -859,14 +860,14 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private String evaluate(String expression, TypeElement targetClassElement, ExecutableElement joinpointElement) {
     TargetClass targetClass = new TargetClass(targetClassElement.getQualifiedName().toString());
-    Joinpoint joinpoint = new Joinpoint(joinpointElement.getSimpleName().toString(), getSignature(joinpointElement));
+    Joinpoint joinpoint = new Joinpoint(joinpointElement.getSimpleName().toString(), this.aptUtils.getSignature(joinpointElement));
     return this.evaluator.evaluate(expression, targetClass, joinpoint);
   }
 
   private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement type, TypeElement annotation) {
     TypeMirror annotationType = annotation.asType();
     List<ExecutableElement> methods = new ArrayList<>();
-    for (Element member : this.processingEnv.getElementUtils().getAllMembers(type)) {
+    for (Element member : this.elements.getAllMembers(type)) {
       if (member.getKind() == ElementKind.METHOD) {
         for (AnnotationMirror mirror : member.getAnnotationMirrors()) {
           if (this.isSameType(mirror.getAnnotationType(), annotationType)) {
@@ -879,7 +880,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private String getPackageName(Element element) {
-    PackageElement packageElement = this.processingEnv.getElementUtils().getPackageOf(element);
+    PackageElement packageElement = this.elements.getPackageOf(element);
     return packageElement.getQualifiedName().toString();
   }
 
@@ -947,7 +948,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private boolean isSameType(TypeMirror t1, TypeMirror t2) {
-    return this.processingEnv.getTypeUtils().isSameType(t1, t2);
+    return this.types.isSameType(t1, t2);
   }
 
   final class ImplementableMethodExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {

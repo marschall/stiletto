@@ -21,6 +21,7 @@ import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.lang.model.util.SimpleElementVisitor8;
 import javax.lang.model.util.SimpleTypeVisitor8;
+import javax.lang.model.util.Types;
 
 /**
  * Utility methods for dealing with {@link javax.lang.model.element}
@@ -28,11 +29,13 @@ import javax.lang.model.util.SimpleTypeVisitor8;
  */
 final class AptUtils {
 
-  private AptUtils() {
-    throw new IllegalArgumentException("not instantiable");
+  private final Types types;
+
+  AptUtils(Types types) {
+    this.types = types;
   }
 
-  static boolean containsAnyNonVoid(List<? extends ExecutableElement> methods) {
+  boolean containsAnyNonVoid(List<? extends ExecutableElement> methods) {
     for (ExecutableElement method : methods) {
       if (method.getReturnType().getKind() != TypeKind.VOID) {
         return true;
@@ -41,7 +44,7 @@ final class AptUtils {
     return false;
   }
 
-  static String getSignature(ExecutableElement executableElement) {
+  String getSignature(ExecutableElement executableElement) {
     StringBuilder buffer = new StringBuilder();
     buffer.append(executableElement.getSimpleName());
     buffer.append('(');
@@ -50,43 +53,43 @@ final class AptUtils {
       if (!first) {
         buffer.append(", ");
       }
-      buffer.append(parameter.asType().toString());
+      buffer.append(this.types.erasure(parameter.asType()).toString());
       first = false;
     }
     buffer.append(')');
     return buffer.toString();
   }
 
-  static String getQualifiedName(Element element) {
+  String getQualifiedName(Element element) {
     return asTypeElement(element).getQualifiedName().toString();
   }
 
-  static String getSimpleName(TypeElement element) {
+  String getSimpleName(TypeElement element) {
     return element.getSimpleName().toString();
   }
 
-  static DeclaredType asDeclaredType(TypeMirror type) {
+  DeclaredType asDeclaredType(TypeMirror type) {
     return type.accept(DeclaredTypeExtractor.INSTANCE, null);
   }
 
 
-  static TypeElement asTypeElement(Element element) {
+  TypeElement asTypeElement(Element element) {
     return element.accept(TypeElementExtractor.INSTANCE, null);
   }
 
-  static TypeMirror asTypeMirror(AnnotationValue annotationValue) {
+  TypeMirror asTypeMirror(AnnotationValue annotationValue) {
     return annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
   }
 
-  static String asString(AnnotationValue annotationValue) {
+  String asString(AnnotationValue annotationValue) {
     return annotationValue.accept(StringExtractor.INSTANCE, null);
   }
 
-  static AnnotationMirror asAnnotationMirror(AnnotationValue annotationValue) {
+  AnnotationMirror asAnnotationMirror(AnnotationValue annotationValue) {
     return annotationValue.accept(AnnotationMirrorExtractor.INSTANCE, null);
   }
 
-  static List<? extends AnnotationValue> asAnnotationValues(AnnotationValue annotationValue) {
+  List<? extends AnnotationValue> asAnnotationValues(AnnotationValue annotationValue) {
     return annotationValue.accept(AnnotationsMirrorExtractor.INSTANCE, null);
   }
 
@@ -99,7 +102,7 @@ final class AptUtils {
 
   }
 
-  static List<ExecutableElement> getNonPrivateConstrctors(TypeElement element) {
+  List<ExecutableElement> getNonPrivateConstrctors(TypeElement element) {
     List<ExecutableElement> constrctors = new ArrayList<>(2);
     for (Element member : element.getEnclosedElements()) {
       member.accept(NonPrivateConstructorExtractor.INSTANCE, constrctors);
