@@ -517,7 +517,31 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private void addMethodConstant(com.squareup.javapoet.CodeBlock.Builder initializerBuilder, ProxyToGenerate proxyToGenerate, MethodConstant methodConstant) {
-    initializerBuilder.addStatement("$N = $T.class.getMethod($S)", methodConstant.getName(), proxyToGenerate.getTargetClassElement(), methodConstant.getMethod().getSimpleName());
+    ExecutableElement method = methodConstant.getMethod();
+    List<? extends VariableElement> parameters = method.getParameters();
+    String constantName = methodConstant.getName();
+    TypeElement targetClass = proxyToGenerate.getTargetClassElement();
+    Name methodName = method.getSimpleName();
+    if (parameters.isEmpty()) {
+      initializerBuilder.addStatement("$N = $T.class.getMethod($S)", constantName, targetClass, methodName);
+    } else {
+      List<Object> formatArguments = new ArrayList<>(3 + parameters.size());
+      formatArguments.add(constantName);
+      formatArguments.add(targetClass);
+      formatArguments.add(methodName);
+      StringBuilder buffer = new StringBuilder();
+      buffer.append("$N = $T.class.getMethod($S, new Class[]{");
+      boolean first = true;
+      for (VariableElement parameter : parameters) {
+        if (!first) {
+          buffer.append(", ");
+        }
+        buffer.append("$T.class");
+        formatArguments.add(TypeName.get(parameter.asType()));
+      }
+      buffer.append("})");
+      initializerBuilder.addStatement(buffer.toString(), formatArguments.toArray());
+    }
   }
 
   private Statement buildAdviceCall(AdviceContext adviceContext) {
