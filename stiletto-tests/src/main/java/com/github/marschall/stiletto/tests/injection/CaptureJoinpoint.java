@@ -27,4 +27,8 @@ public class CaptureJoinpoint {
     return list.size();
   }
 
+  public int array(String[] array) {
+    return array.length;
+  }
+
 }

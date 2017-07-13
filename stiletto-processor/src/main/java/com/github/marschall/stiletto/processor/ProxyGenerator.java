@@ -532,12 +532,13 @@ public class ProxyGenerator extends AbstractProcessor {
       StringBuilder buffer = new StringBuilder();
       buffer.append("$N = $T.class.getMethod($S, new Class[]{");
       boolean first = true;
+      Types types = this.processingEnv.getTypeUtils();
       for (VariableElement parameter : parameters) {
         if (!first) {
           buffer.append(", ");
         }
         buffer.append("$T.class");
-        formatArguments.add(TypeName.get(parameter.asType()));
+        formatArguments.add(TypeName.get(types.erasure(parameter.asType())));
       }
       buffer.append("})");
       initializerBuilder.addStatement(buffer.toString(), formatArguments.toArray());

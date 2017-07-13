@@ -78,4 +78,15 @@ public class JoinpointTest {
     assertArrayEquals(new Class[] {List.class}, joinpoint.getParameterTypes());
   }
 
+  @Test
+  public void array() {
+    this.proxy.array(new String[] {"1"});
+
+    Method joinpoint = this.aspect.getJoinpoint();
+    assertNotNull(joinpoint);
+    assertEquals("array", joinpoint.getName());
+    assertEquals(CaptureJoinpoint.class, joinpoint.getDeclaringClass());
+    assertArrayEquals(new Class[] {String[].class}, joinpoint.getParameterTypes());
+  }
+
 }
