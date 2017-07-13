@@ -1,6 +1,5 @@
 package com.github.marschall.stiletto.tests.advice;
 
-import com.github.marschall.stiletto.api.advice.AfterReturning;
 import com.github.marschall.stiletto.api.advice.AfterThrowing;
 
 public class AfterThrowingAspect {

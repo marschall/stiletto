@@ -31,7 +31,7 @@ public class AfterThrowingAdvisedInterfaceTest {
   }
 
   @Test
-  public void afterThrowingAWithException() {
+  public void afterThrowingWithException() {
 
     AfterThrowingAdvisedInterface targetObject = () ->  {
       assertEquals(0, this.aspect.getInvocationCount());
@@ -49,6 +49,5 @@ public class AfterThrowingAdvisedInterfaceTest {
     }
     assertEquals(1, this.aspect.getInvocationCount());
   }
-
 
 }

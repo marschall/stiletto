@@ -10,7 +10,7 @@ public class AroundWithoutReturnValueOrArgumentsAdvisedInterfaceTest {
 
   @Test
   public void simpleMethodIntConstructor() {
-    AroundWithoutReturnValueOrArgumentsAdvisedInterface targetObject = (s) -> s;
+    AroundWithoutReturnValueOrArgumentsAdvisedInterface targetObject = s -> s;
     AroundWithoutReturnValueOrArgumentsAspect aspect =
             new AroundWithoutReturnValueOrArgumentsAspect();
     AroundWithoutReturnValueOrArgumentsAdvisedInterface proxy =
