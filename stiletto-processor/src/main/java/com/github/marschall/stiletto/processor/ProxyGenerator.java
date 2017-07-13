@@ -487,9 +487,9 @@ public class ProxyGenerator extends AbstractProcessor {
                 .addParameter(TypeName.get(proxyToGenerate.getAspect()), "aspect")
                 // add super call even for default constructor in oder to aid debugging
                 .addStatement(buildSuperCall(constrctor))
-                .addStatement("$T.requireNonNull(targetObject, $S)", Objects.class, "targetObject")
-                .addStatement("this.targetObject = targetObject")
-                .addStatement("$T.requireNonNull(aspect, $S)", Objects.class, "aspect")
+                .addStatement("$T.requireNonNull($N, $S)", Objects.class, "targetObject", "targetObject")
+                .addStatement("this.$N = $N", "targetObject", "targetObject")
+                .addStatement("$T.requireNonNull($N, $S)", Objects.class, "aspect", "aspect")
                 .addStatement("this.$N = $N", "aspect", "aspect")
                 .build());
       }
