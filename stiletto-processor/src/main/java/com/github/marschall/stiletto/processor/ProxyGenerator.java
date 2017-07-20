@@ -381,8 +381,10 @@ public class ProxyGenerator extends AbstractProcessor {
       }
 
       if (needsReturnValue) {
-        methodBuilder.addStatement("$T " + joinpointContext.getReturnVariableName()
-        + " = " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method), method.getReturnType());
+        String returnVariableName = joinpointContext.getReturnVariableName();
+        TypeMirror returnType = method.getReturnType();
+        String methodName = method.getSimpleName().toString();
+        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, method), returnType, returnVariableName);
       }
 
 
