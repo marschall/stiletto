@@ -23,7 +23,7 @@ import com.github.marschall.stiletto.api.injection.Joinpoint;
 import com.github.marschall.stiletto.api.injection.MethodCall;
 import com.github.marschall.stiletto.api.injection.ReturnValue;
 import com.github.marschall.stiletto.api.injection.TargetObject;
-import com.github.marschall.stiletto.api.invocation.ActualMethodCallWithoutResult;
+import com.github.marschall.stiletto.api.invocation.ActualMethodCall;
 
 /**
  * Reimplementation of {@link org.springframework.cache.interceptor.CacheInterceptor}.
@@ -58,14 +58,14 @@ public class CacheableAspect {
   @Around
   @Cacheable
   @WithAnnotationMatching(Cacheable.class)
-  public void invoke(@DeclaredAnnotation Cacheable cacheable,
+  public <R> R invoke(@DeclaredAnnotation Cacheable cacheable,
           @DeclaredAnnotation Optional<CacheConfig> cacheConfig,
           @TargetObject Object targetObject,
           @Joinpoint Method method,
           @Arguments Object[] arguments,
           @ReturnValue Object value,
-          @MethodCall ActualMethodCallWithoutResult call) {
-
+          @MethodCall ActualMethodCall<R> call) {
+    return call.invoke();
   }
 
   @AfterReturning

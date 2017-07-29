@@ -13,7 +13,7 @@ import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.injection.MethodCall;
-import com.github.marschall.stiletto.api.invocation.ActualMethodCallWithResult;
+import com.github.marschall.stiletto.api.invocation.ActualMethodCall;
 
 /**
  * Reimplementation of {@link org.springframework.transaction.interceptor.TransactionInterceptor}.
@@ -45,7 +45,7 @@ public final class TransactionalAspect extends AbstractTransactionalAspect {
   @WithAnnotationMatching(Transactional.class)
   public Object invoke(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
-          @MethodCall ActualMethodCallWithResult<?> call) {
+          @MethodCall ActualMethodCall<?> call) {
 
     TransactionDefinition definition = newTransactionDefinition(transactional, joinpointIdentification);
     TransactionStatus transaction = this.txManager.getTransaction(definition);
