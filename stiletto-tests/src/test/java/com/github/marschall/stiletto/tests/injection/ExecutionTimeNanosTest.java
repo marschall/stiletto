@@ -9,7 +9,7 @@ import org.junit.Test;
 public class ExecutionTimeNanosTest {
 
   @Test
-  public void noArgument() {
+  public void executionTime() {
     CaptureExecutionTimeNanosAspect aspect = new CaptureExecutionTimeNanosAspect();
     InjectExecutionTimeNanos targetObject = () -> {
       try {

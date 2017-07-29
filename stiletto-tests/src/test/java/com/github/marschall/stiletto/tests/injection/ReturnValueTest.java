@@ -7,7 +7,7 @@ import org.junit.Test;
 public class ReturnValueTest {
 
   @Test
-  public void noArgument() {
+  public void returnValue() {
     CaptureReturnValueAspect aspect = new CaptureReturnValueAspect();
     InjectReturnValue targetObject = () -> "return value";
     InjectReturnValue proxy = new InjectReturnValue_(targetObject, aspect);

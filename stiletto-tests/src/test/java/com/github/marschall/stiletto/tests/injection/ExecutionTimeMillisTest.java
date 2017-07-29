@@ -9,7 +9,7 @@ import org.junit.Test;
 public class ExecutionTimeMillisTest {
 
   @Test
-  public void noArgument() {
+  public void executionTime() {
     CaptureExecutionTimeMillisAspect aspect = new CaptureExecutionTimeMillisAspect();
     InjectExecutionTimeMillis targetObject = () -> {
       try {
