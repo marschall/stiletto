@@ -68,6 +68,20 @@ import com.squareup.javapoet.TypeVariableName;
 @SupportedSourceVersion(RELEASE_8)
 public class ProxyGenerator extends AbstractProcessor {
 
+  private static final String EXECUTION_TIME_NANOS = "com.github.marschall.stiletto.api.injection.ExecutionTimeNanos";
+
+  private static final String EXECUTION_TIME_MILLIS = "com.github.marschall.stiletto.api.injection.ExecutionTimeMillis";
+
+  private static final String JOINPOINT = "com.github.marschall.stiletto.api.injection.Joinpoint";
+
+  private static final String ARGUMENTS = "com.github.marschall.stiletto.api.injection.Arguments";
+
+  private static final String RETURN_VALUE = "com.github.marschall.stiletto.api.injection.ReturnValue";
+
+  private static final String TARGET_OBJECT = "com.github.marschall.stiletto.api.injection.TargetObject";
+
+  private static final String EVALUATE = "com.github.marschall.stiletto.api.injection.Evaluate";
+
   static final String ADVISE_BY_ALL = "com.github.marschall.stiletto.api.generation.AdviseByAll";
 
   static final String ADVISE_BY = "com.github.marschall.stiletto.api.generation.AdviseBy";
@@ -116,6 +130,12 @@ public class ProxyGenerator extends AbstractProcessor {
   // @Joinpoint
   private TypeMirror joinpointType;
 
+  // @ExecutionTimeMillis
+  private TypeMirror executionTimeMillisType;
+
+  // @ExecutionTimeNanos
+  private TypeMirror executionTimeNanosType;
+
   // FIXME should all be type mirrors
   private TypeElement before;
 
@@ -143,37 +163,47 @@ public class ProxyGenerator extends AbstractProcessor {
 
     this.elements = this.processingEnv.getElementUtils();
     this.types = this.processingEnv.getTypeUtils();
-    TypeElement adviseBy = this.elements.getTypeElement(ADVISE_BY);
-    this.before = this.elements.getTypeElement(BEFORE);
-    this.around = this.elements.getTypeElement(AROUND);
-    this.afterThrowing = this.elements.getTypeElement(AFTER_THROWING);
-    this.afterReturning = this.elements.getTypeElement(AFTER_RETURNING);
-    this.afterFinally = this.elements.getTypeElement(AFTER_FINALLY);
+    TypeElement adviseBy = this.getTypeElement(ADVISE_BY);
+    this.before = this.getTypeElement(BEFORE);
+    this.around = this.getTypeElement(AROUND);
+    this.afterThrowing = this.getTypeElement(AFTER_THROWING);
+    this.afterReturning = this.getTypeElement(AFTER_RETURNING);
+    this.afterFinally = this.getTypeElement(AFTER_FINALLY);
     this.adviseByValueMethod = getValueMethod(adviseBy);
-    this.intType = types.getPrimitiveType(TypeKind.INT);
-    this.longType = types.getPrimitiveType(TypeKind.LONG);
-    this.objectType = this.processingEnv.getElementUtils().getTypeElement("java.lang.Object").asType();
+    this.intType = this.types.getPrimitiveType(TypeKind.INT);
+    this.longType = this.types.getPrimitiveType(TypeKind.LONG);
+    this.objectType = this.getTypeElement("java.lang.Object").asType();
 
-    TypeElement evaluateElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Evaluate");
+    TypeElement evaluateElement = this.getTypeElement(EVALUATE);
     this.evaluateValueMethod = this.getValueMethod(evaluateElement);
     this.evaluateType = evaluateElement.asType();
 
-    TypeElement targetObjectElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.TargetObject");
+    TypeElement targetObjectElement = this.getTypeElement(TARGET_OBJECT);
     this.targetObjectType = targetObjectElement.asType();
 
-    TypeElement returnValueElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.ReturnValue");
+    TypeElement returnValueElement = this.getTypeElement(RETURN_VALUE);
     this.returnValueType = returnValueElement.asType();
 
-    TypeElement argumentsElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Arguments");
+    TypeElement argumentsElement = this.getTypeElement(ARGUMENTS);
     this.argumentsType = argumentsElement.asType();
 
-    TypeElement joinpointElement = this.processingEnv.getElementUtils().getTypeElement("com.github.marschall.stiletto.api.injection.Joinpoint");
+    TypeElement joinpointElement = this.getTypeElement(JOINPOINT);
     this.joinpointType = joinpointElement.asType();
+
+    TypeElement executionTimeMillisElement = this.getTypeElement(EXECUTION_TIME_MILLIS);
+    this.executionTimeMillisType = executionTimeMillisElement.asType();
+
+    TypeElement executionTimeNanosElement = this.getTypeElement(EXECUTION_TIME_NANOS);
+    this.executionTimeNanosType = executionTimeNanosElement.asType();
 
     this.namingStrategy = s -> s + "_";
     this.evaluator = new ExpressionEvaluator();
 
     this.aptUtils = new AptUtils(this.types);
+  }
+
+  private TypeElement getTypeElement(CharSequence name) {
+    return this.processingEnv.getElementUtils().getTypeElement(name);
   }
 
   @Override
@@ -190,7 +220,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private Set<ProxyToGenerate> extractAspectsToGenerate(RoundEnvironment roundEnv) {
-    TypeElement adviseByAllElement = this.elements.getTypeElement(ADVISE_BY_ALL);
+    TypeElement adviseByAllElement = this.getTypeElement(ADVISE_BY_ALL);
     ExecutableElement adviseByAllValueMethod = getValueMethod(adviseByAllElement);
 
     // handle @AdviseByAll
@@ -210,7 +240,7 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     // handle @AdviseBy
-    TypeElement adviseByElement = this.elements.getTypeElement(ADVISE_BY);
+    TypeElement adviseByElement = this.getTypeElement(ADVISE_BY);
     for (Element processedClass : roundEnv.getElementsAnnotatedWith(adviseByElement)) {
       if (!validateAnnoatedClass(processedClass)) {
         continue;
@@ -612,7 +642,7 @@ public class ProxyGenerator extends AbstractProcessor {
     for (AnnotationMirror mirror : this.elements.getAllAnnotationMirrors(adviceParameter)) {
       DeclaredType annotationType = mirror.getAnnotationType();
       // unfortunately due to javax.lang.model.type.TypeMirror.equals(Object)
-      // we can not use a map here
+      // we can not use a java.util.Map here
       if (isSameType(annotationType, this.evaluateType)) { // @Evaluate
         if (argument != null) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
@@ -640,11 +670,39 @@ public class ProxyGenerator extends AbstractProcessor {
           return argument;
         }
         if (hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturning)) {
-          this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ReturnValue is only available for @afterReturning");
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ReturnValue is only available for @AfterReturning");
+          return argument;
+        }
+      } else if (isSameType(annotationType, this.executionTimeMillisType)) { // @ExecutionTimeMillis
+        if (argument != null) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
+          return argument;
+        }
+        if (hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturning)) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeMillis is only available for @AfterReturning");
+          return argument;
+        }
+        if (isSameType(adviceParameter, this.longType)) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeMillis must be of type long");
           return argument;
         }
 
-        argument = buildReturnValueArgument(adviceContext);
+        argument = buildExectionTimeMillisArgument(adviceContext);
+      } else if (isSameType(annotationType, this.executionTimeNanosType)) { // @ExecutionTimeNanos
+        if (argument != null) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
+          return argument;
+        }
+        if (hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturning)) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeNanos is only available for @AfterReturning");
+          return argument;
+        }
+        if (isSameType(adviceParameter, this.longType)) {
+          this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeNanos must be of type long");
+          return argument;
+        }
+
+        argument = buildExectionTimeNanosArgument(adviceContext);
       } else if (isSameType(annotationType, this.joinpointType)) { // @Joinpoint
         if (argument != null) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
@@ -669,6 +727,13 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private Argument buildReturnValueArgument(AdviceContext adviceContext) {
     return new Argument(adviceContext.getJoinpointContext().getReturnVariableName());
+  }
+
+  private Argument buildExectionTimeMillisArgument(AdviceContext adviceContext) {
+    return new Argument(adviceContext.getJoinpointContext().getExectionTimeMillisName());
+  }
+  private Argument buildExectionTimeNanosArgument(AdviceContext adviceContext) {
+    return new Argument(adviceContext.getJoinpointContext().getExectionTimeNanosName());
   }
 
   private Argument buildArgumentsArgument(AdviceContext adviceContext) {
