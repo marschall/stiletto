@@ -16,7 +16,6 @@ import org.springframework.cache.interceptor.KeyGenerator;
 import com.github.marschall.stiletto.api.advice.AfterReturning;
 import com.github.marschall.stiletto.api.advice.Around;
 import com.github.marschall.stiletto.api.advice.Before;
-import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.Arguments;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.Joinpoint;
@@ -24,6 +23,7 @@ import com.github.marschall.stiletto.api.injection.MethodCall;
 import com.github.marschall.stiletto.api.injection.ReturnValue;
 import com.github.marschall.stiletto.api.injection.TargetObject;
 import com.github.marschall.stiletto.api.invocation.ActualMethodCall;
+import com.github.marschall.stiletto.api.pointcut.Matching;
 
 /**
  * Reimplementation of {@link org.springframework.cache.interceptor.CacheInterceptor}.
@@ -57,7 +57,7 @@ public class CacheableAspect {
 
   @Around
   @Cacheable
-  @WithAnnotationMatching(Cacheable.class)
+  @Matching(Cacheable.class)
   public <R> R invoke(@DeclaredAnnotation Cacheable cacheable,
           @DeclaredAnnotation Optional<CacheConfig> cacheConfig,
           @TargetObject Object targetObject,
@@ -70,7 +70,7 @@ public class CacheableAspect {
 
   @AfterReturning
   @CachePut
-  @WithAnnotationMatching(CachePut.class)
+  @Matching(CachePut.class)
   public void cachePut(@DeclaredAnnotation CachePut cachePut,
           @DeclaredAnnotation Optional<CacheConfig> cacheConfig,
           @TargetObject Object targetObject,
@@ -92,7 +92,7 @@ public class CacheableAspect {
   // org.springframework.cache.interceptor.CacheAspectSupport.performCacheEvict(CacheOperationContext, CacheEvictOperation, Object)
   @AfterReturning
   @CacheEvict(beforeInvocation = false, allEntries = true)
-  @WithAnnotationMatching(CacheEvict.class)
+  @Matching(CacheEvict.class)
   public void cacheEvictAllAfter(
           @DeclaredAnnotation CacheEvict cacheEvict,
           @DeclaredAnnotation Optional<CacheConfig> cacheConfig) {
@@ -102,7 +102,7 @@ public class CacheableAspect {
 
   @AfterReturning
   @CacheEvict(beforeInvocation = false, allEntries = false)
-  @WithAnnotationMatching(CacheEvict.class)
+  @Matching(CacheEvict.class)
   public void cacheEvictAfter(
           @DeclaredAnnotation CacheEvict cacheEvict,
           @DeclaredAnnotation Optional<CacheConfig> cacheConfig,
@@ -115,7 +115,7 @@ public class CacheableAspect {
 
   @Before
   @CacheEvict(beforeInvocation = true, allEntries = true)
-  @WithAnnotationMatching(CacheEvict.class)
+  @Matching(CacheEvict.class)
   public void cacheEvictAllBefore(
           @DeclaredAnnotation CacheEvict cacheEvict,
           @DeclaredAnnotation Optional<CacheConfig> cacheConfig) {
@@ -125,7 +125,7 @@ public class CacheableAspect {
 
   @Before
   @CacheEvict(beforeInvocation = true, allEntries = false)
-  @WithAnnotationMatching(CacheEvict.class)
+  @Matching(CacheEvict.class)
   public void cacheEvictBefore(
           @DeclaredAnnotation CacheEvict cacheEvict,
           @DeclaredAnnotation Optional<CacheConfig> cacheConfig,

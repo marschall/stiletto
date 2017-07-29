@@ -351,58 +351,7 @@ public class ProxyGenerator extends AbstractProcessor {
     TargetObjectContext targetObjectContext = new TargetObjectContext();
     List<MethodConstant> methodConstants = new ArrayList<>();
     for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
-      // TODO
-      Element apectElement = this.types.asElement(proxyToGenerate.getAspect());
-      TypeElement aspectType = this.aptUtils.asTypeElement(apectElement);
-
-      List<ExecutableElement> afterReturningMethods = getAfterReturningMethods(aspectType);
-      List<ExecutableElement> afterFinallyMethods = getAfterFinallyMethods(aspectType);
-      List<ExecutableElement> aroundMethods = getAroundMethods(aspectType);
-      List<ExecutableElement> beforeMethods = getBeforeMethods(aspectType);
-      boolean isVoid = method.getReturnType().getKind() == TypeKind.VOID;
-      boolean needsReturnValue = !isVoid
-              && (!afterReturningMethods.isEmpty()
-                      || !afterFinallyMethods.isEmpty()
-                      || !aroundMethods.isEmpty());
-
-      JoinpointContext joinpointContext;
-      if (needsReturnValue) {
-        joinpointContext = new JoinpointContext(targetClass, method, targetObjectContext, "returnValue");
-      } else {
-        joinpointContext = new JoinpointContext(targetClass, method, targetObjectContext);
-      }
-
-      com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(method);
-
-      for (ExecutableElement beforeMethod : beforeMethods) {
-        AdviceContext adviceContext = new AdviceContext(beforeMethod, joinpointContext);
-        Statement adviceCall = buildAdviceCall(adviceContext);
-        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
-      }
-
-      if (needsReturnValue) {
-        String returnVariableName = joinpointContext.getReturnVariableName();
-        TypeMirror returnType = method.getReturnType();
-        String methodName = method.getSimpleName().toString();
-        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, method), returnType, returnVariableName);
-      }
-
-
-      for (ExecutableElement afterReturningMethod : afterReturningMethods) {
-        AdviceContext adviceContext = new AdviceContext(afterReturningMethod, joinpointContext);
-        Statement adviceCall = buildAdviceCall(adviceContext);
-        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
-      }
-
-      if (needsReturnValue) {
-        methodBuilder.addStatement("return " + joinpointContext.getReturnVariableName());
-      } else if (isVoid) {
-        methodBuilder.addStatement(buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
-      } else {
-        methodBuilder.addStatement("return " + buildDelegateCall("this.targetObject." + method.getSimpleName(), method));
-      }
-
-      proxyClassBilder.addMethod(methodBuilder.build());
+      JoinpointContext joinpointContext = implementMethod(proxyToGenerate, proxyClassBilder, targetObjectContext, method);
 
       if (joinpointContext.hasMethodConstantName()) {
         methodConstants.add(new MethodConstant(joinpointContext.getMethodConstantName(), method));
@@ -424,6 +373,89 @@ public class ProxyGenerator extends AbstractProcessor {
       javaFile.writeTo(writer);
     }
 
+  }
+
+  private JoinpointContext implementMethod(ProxyToGenerate proxyToGenerate,
+          Builder proxyClassBilder, TargetObjectContext targetObjectContext, ExecutableElement methodToImplement) {
+
+    TypeElement targetClass = proxyToGenerate.getTargetClassElement();
+
+    AdviceMethods adviceMethods = getAdviceMethods(proxyToGenerate);
+    boolean isVoid = methodToImplement.getReturnType().getKind() == TypeKind.VOID;
+    boolean needsReturnValue;
+    if (isVoid) {
+      needsReturnValue = false;
+    } else {
+      needsReturnValue = doMethodsNeedReturnValue(adviceMethods);
+    }
+
+    com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(methodToImplement);
+    JoinpointContext joinpointContext;
+    if (needsReturnValue) {
+      joinpointContext = new JoinpointContext(targetClass, methodToImplement, targetObjectContext, "returnValue", methodBuilder);
+    } else {
+      joinpointContext = new JoinpointContext(targetClass, methodToImplement, targetObjectContext, methodBuilder);
+    }
+
+    // @Before
+    addBeforeMethods(adviceMethods, joinpointContext);
+
+    if (needsReturnValue) {
+      // returnVariableName = this.targetObject.joinpoint();
+      String returnVariableName = joinpointContext.getReturnVariableName();
+      TypeMirror returnType = methodToImplement.getReturnType();
+      String methodName = methodToImplement.getSimpleName().toString();
+      if (adviceMethods.getAroundMethods().isEmpty()) {
+        // returnVariableName = this.targetObject.joinpoint();
+        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, methodToImplement), returnType, returnVariableName);
+      } else {
+        // returnVariableName = this.aspect.joinpoint(new ActualMethodCall() {
+        //     @Override
+        //     public R invoke() {
+        //       return TargetClass.this.joinpoint();
+        //     }
+        // });
+        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, methodToImplement), returnType, returnVariableName);
+      }
+    }
+
+
+    // @AfterReturningMethod
+    addAfterReturningMethods(adviceMethods, joinpointContext);
+
+    // return
+    if (needsReturnValue) {
+      // return returnVariableName;
+      methodBuilder.addStatement("return " + joinpointContext.getReturnVariableName());
+    } else {
+      String delegateCall = buildDelegateCall("this.targetObject." + methodToImplement.getSimpleName(), methodToImplement);
+      if (isVoid) {
+        // this.targetObject.joinpoint();
+        methodBuilder.addStatement(delegateCall);
+      } else {
+        // return this.targetObject.joinpoint();
+        methodBuilder.addStatement("return " + delegateCall);
+      }
+    }
+
+    proxyClassBilder.addMethod(methodBuilder.build());
+    return joinpointContext;
+  }
+
+  private void addAfterReturningMethods(AdviceMethods adviceMethods, JoinpointContext joinpointContext) {
+    for (ExecutableElement afterReturningMethod : adviceMethods.getAfterReturningMethods()) {
+      AdviceContext adviceContext = new AdviceContext(afterReturningMethod, joinpointContext);
+      Statement adviceCall = buildAdviceCall(adviceContext);
+      joinpointContext.getMethodBuilder().addStatement(adviceCall.getFormat(), adviceCall.getArguments());
+    }
+  }
+
+  private void addBeforeMethods(AdviceMethods adviceMethods, JoinpointContext joinpointContext) {
+    for (ExecutableElement beforeMethod : adviceMethods.getBeforeMethods()) {
+      AdviceContext adviceContext = new AdviceContext(beforeMethod, joinpointContext);
+      Statement adviceCall = buildAdviceCall(adviceContext);
+      joinpointContext.getMethodBuilder().addStatement(adviceCall.getFormat(), adviceCall.getArguments());
+    }
   }
 
   private void addSuperType(ProxyToGenerate proxyToGenerate, Builder proxyClassBilder) {
@@ -670,6 +702,12 @@ public class ProxyGenerator extends AbstractProcessor {
     JoinpointContext joinpointContext = adviceContext.getJoinpointContext();
 
     return new Argument("$S", evaluate(expression, joinpointContext.getTargetClassElement(), joinpointContext.getJoinpointElement()));
+  }
+
+  private boolean doMethodsNeedReturnValue(AdviceMethods adviceMethods) {
+    return !adviceMethods.getAfterReturningMethods().isEmpty()
+                    || !adviceMethods.getAfterFinallyMethods().isEmpty()
+                    || !adviceMethods.getAroundMethods().isEmpty();
   }
 
   private boolean hasAnnotationMirror(ExecutableElement adviceMethod, TypeElement typeElement) {
@@ -953,6 +991,51 @@ public class ProxyGenerator extends AbstractProcessor {
     return this.types.isSameType(t1, t2);
   }
 
+  private AdviceMethods getAdviceMethods(ProxyToGenerate proxyToGenerate) {
+    // TODO
+    Element apectElement = this.types.asElement(proxyToGenerate.getAspect());
+    TypeElement aspectType = this.aptUtils.asTypeElement(apectElement);
+
+    List<ExecutableElement> beforeMethods = getBeforeMethods(aspectType);
+    List<ExecutableElement> aroundMethods = getAroundMethods(aspectType);
+    List<ExecutableElement> afterReturningMethods = getAfterReturningMethods(aspectType);
+    List<ExecutableElement> afterFinallyMethods = getAfterFinallyMethods(aspectType);
+
+    return new AdviceMethods(beforeMethods, aroundMethods, afterReturningMethods, afterFinallyMethods);
+  }
+
+  static final class AdviceMethods {
+
+    private final List<ExecutableElement> beforeMethods;
+    private final List<ExecutableElement> aroundMethods;
+    private final List<ExecutableElement> afterReturningMethods;
+    private final List<ExecutableElement> afterFinallyMethods;
+
+    AdviceMethods(List<ExecutableElement> beforeMethods, List<ExecutableElement> aroundMethods, List<ExecutableElement> afterReturningMethods, List<ExecutableElement> afterFinallyMethods) {
+      this.beforeMethods = beforeMethods;
+      this.aroundMethods = aroundMethods;
+      this.afterReturningMethods = afterReturningMethods;
+      this.afterFinallyMethods = afterFinallyMethods;
+    }
+
+    List<ExecutableElement> getBeforeMethods() {
+      return this.beforeMethods;
+    }
+
+    List<ExecutableElement> getAroundMethods() {
+      return this.aroundMethods;
+    }
+
+    List<ExecutableElement> getAfterReturningMethods() {
+      return this.afterReturningMethods;
+    }
+
+    List<ExecutableElement> getAfterFinallyMethods() {
+      return this.afterFinallyMethods;
+    }
+
+  }
+
   final class ImplementableMethodExtractor extends SimpleElementVisitor8<Void, List<ExecutableElement>> {
 
     @Override
@@ -995,16 +1078,18 @@ public class ProxyGenerator extends AbstractProcessor {
     private final TargetObjectContext targetObjectContext;
     private final String returnVariableName;
     private String methodConstantName;
+    private final com.squareup.javapoet.MethodSpec.Builder methodBuilder;
 
-    JoinpointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext) {
-      this(targetClassElement, joinpointElement, targetObjectContext, null);
+    JoinpointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext, com.squareup.javapoet.MethodSpec.Builder methodBuilder) {
+      this(targetClassElement, joinpointElement, targetObjectContext, null, methodBuilder);
     }
 
-    JoinpointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext, String returnVariableName) {
+    JoinpointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext, String returnVariableName, com.squareup.javapoet.MethodSpec.Builder methodBuilder) {
       this.targetClassElement = targetClassElement;
       this.joinpointElement = joinpointElement;
       this.targetObjectContext = targetObjectContext;
       this.returnVariableName = returnVariableName;
+      this.methodBuilder = methodBuilder;
     }
 
     String getMethodConstantName() {
@@ -1056,6 +1141,10 @@ public class ProxyGenerator extends AbstractProcessor {
 
     boolean needsFinally() {
       return false;
+    }
+
+    com.squareup.javapoet.MethodSpec.Builder getMethodBuilder() {
+      return this.methodBuilder;
     }
 
   }

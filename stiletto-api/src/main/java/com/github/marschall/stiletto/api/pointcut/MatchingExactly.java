@@ -1,4 +1,4 @@
-package com.github.marschall.stiletto.api.advice;
+package com.github.marschall.stiletto.api.pointcut;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target(METHOD)
-public @interface WithAnnotationMatchingExactly {
+public @interface MatchingExactly {
 
   // all attributes have to match
 

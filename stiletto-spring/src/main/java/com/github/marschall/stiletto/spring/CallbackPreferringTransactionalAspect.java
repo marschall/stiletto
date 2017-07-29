@@ -9,11 +9,11 @@ import org.springframework.transaction.support.CallbackPreferringPlatformTransac
 import org.springframework.transaction.support.TransactionCallback;
 
 import com.github.marschall.stiletto.api.advice.Around;
-import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.injection.MethodCall;
 import com.github.marschall.stiletto.api.invocation.ActualMethodCall;
+import com.github.marschall.stiletto.api.pointcut.Matching;
 
 /**
  * Reimplementation of {@link org.springframework.transaction.interceptor.TransactionInterceptor}
@@ -30,7 +30,7 @@ public final class CallbackPreferringTransactionalAspect extends AbstractTransac
 
   @Around
   @Transactional
-  @WithAnnotationMatching(Transactional.class)
+  @Matching(Transactional.class)
   public Object invoke(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
           @MethodCall ActualMethodCall<?> call) {
