@@ -16,4 +16,14 @@ public class LeafClassTest {
     assertTrue(IntermediateInterface.class.isAssignableFrom(LeafClass_.class));
   }
 
+  @Test
+  public void sameInterfaceTwice() {
+    assertTrue(IntermediateInterface.class.isAssignableFrom(LeafClassSameInterface_.class));
+  }
+
+  @Test
+  public void genericInterface() {
+    assertTrue(IntermediateInterfaceGeneric.class.isAssignableFrom(LeafClassGeneric_.class));
+  }
+
 }

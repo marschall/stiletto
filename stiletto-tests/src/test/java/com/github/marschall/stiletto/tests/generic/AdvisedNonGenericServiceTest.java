@@ -21,7 +21,7 @@ public class AdvisedNonGenericServiceTest {
 
     AdvisedNonGenericService targetObject = new AdvisedNonGenericService();
 
-    AdvisedNonGenericService proxy = new AdvisedNonGenericService_(targetObject, this.aspect);
+    GenericInterface<String> proxy = new AdvisedNonGenericService_(targetObject, this.aspect);
 
     assertEquals(0, this.aspect.getInvocationCount());
     assertEquals("ok", proxy.genericMethod());

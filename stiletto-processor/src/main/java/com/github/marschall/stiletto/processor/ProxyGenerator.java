@@ -12,6 +12,7 @@ import static javax.lang.model.element.Modifier.STATIC;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -929,7 +930,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private String getFullyQualifiedProxyClassName(String packageName, String proxyClassName) {
-    // FIXME find method
+    // FIXME find method provided by APT API
     if (packageName.isEmpty()) {
       return proxyClassName;
     } else {
@@ -973,19 +974,68 @@ public class ProxyGenerator extends AbstractProcessor {
     if (typeElement.getKind() == ElementKind.INTERFACE) {
       return false;
     }
-    for (Element element : this.elements.getAllMembers(typeElement)) {
-      if (element.getKind() == ElementKind.METHOD && isOverriable(element)) {
-        if (element.getEnclosingElement().getKind() != ElementKind.INTERFACE) {
-          // TODO check if method overrides any interface method
-          //          ExecutableElement interfaceMethod = null;
-          //          if (!this.processingEnv.getElementUtils().overrides((ExecutableElement) element, interfaceMethod, typeElement)) {
-          //            return false;
-          //          }
+    Map<String, Set<ExecutableElement>> interfaceMethods = this.collectInterfaceMethods(typeElement);
+    for (Element member : this.elements.getAllMembers(typeElement)) {
+      if (member.getKind() == ElementKind.METHOD && isOverriable(member)) {
+        if (member.getEnclosingElement().getKind() != ElementKind.INTERFACE) {
+          // TODO use method instead of case
+          ExecutableElement method = (ExecutableElement) member;
+          if (!isOverridableObjectMethod(method)) {
+            String methodName = method.getSimpleName().toString();
+
+            Set<ExecutableElement> methodsWithSameName = interfaceMethods.getOrDefault(methodName, Collections.emptySet());
+            boolean overrides = false;
+
+            for (ExecutableElement interfaceMethod : methodsWithSameName) {
+              // linear scan, doesn't scale well, let's hope we don't have too many overloaded methods
+              if (this.elements.overrides(method, interfaceMethod, typeElement)) {
+                overrides = true;
+                break;
+              }
+            }
+
+            if (!overrides) {
+              return true;
+            }
+          }
         }
       }
     }
-    // javax.lang.model.util.Elements.overrides(ExecutableElement, ExecutableElement, TypeElement)
-    return true;
+    return false;
+  }
+
+  private Map<String, Set<ExecutableElement>> collectInterfaceMethods(TypeElement clazz) {
+    Map<String, Set<ExecutableElement>> interfaceMethods = new HashMap<>();
+    this.addInterfaceMethods(clazz, interfaceMethods);
+    return interfaceMethods;
+  }
+
+  private void addInterfaceMethods(TypeElement clazz, Map<String, Set<ExecutableElement>> interfaceMethods) {
+    if (this.isSameType(clazz, this.objectType)) {
+      return;
+    }
+
+    for (TypeMirror iface : clazz.getInterfaces()) {
+      this.addMethods(this.asTypeElement(iface), interfaceMethods);
+    }
+
+    this.addInterfaceMethods(this.asTypeElement(clazz.getSuperclass()), interfaceMethods);
+  }
+
+  private TypeElement asTypeElement(TypeMirror typeMirror) {
+    return this.aptUtils.asTypeElement(this.types.asElement(typeMirror));
+  }
+
+  private void addMethods(TypeElement typeElement, Map<String, Set<ExecutableElement>> interfaceMethods) {
+    for (Element member : typeElement.getEnclosedElements()) {
+      if (member.getKind() == ElementKind.METHOD && isOverriable(member)) {
+        // TODO use method instead of case
+        ExecutableElement method = (ExecutableElement) member;
+        String methodName = method.getSimpleName().toString();
+        Set<ExecutableElement> methodsWithSameName = interfaceMethods.computeIfAbsent(methodName, (key) -> new HashSet<>());
+        methodsWithSameName.add(method);
+      }
+    }
   }
 
   // generic JavaPoet stuff
@@ -1107,7 +1157,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private AdviceMethods getAdviceMethods(ProxyToGenerate proxyToGenerate) {
-    // TODO
+    // TODO probably make aspectType an accessor method
     Element apectElement = this.types.asElement(proxyToGenerate.getAspect());
     TypeElement aspectType = this.aptUtils.asTypeElement(apectElement);
 
