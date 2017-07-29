@@ -136,16 +136,16 @@ public class ProxyGenerator extends AbstractProcessor {
   // @ExecutionTimeNanos
   private TypeMirror executionTimeNanosType;
 
-  // FIXME should all be type mirrors
-  private TypeElement before;
+  // @AfterReturning
+  private TypeMirror afterReturningType;
 
-  private TypeElement around;
+  private TypeMirror afterFinallyType;
 
-  private TypeElement afterThrowing;
+  private TypeMirror afterThrowingType;
 
-  private TypeElement afterReturning;
+  private TypeMirror aroundType;
 
-  private TypeElement afterFinally;
+  private TypeMirror beforeType;
 
   private ExpressionEvaluator evaluator;
 
@@ -164,11 +164,16 @@ public class ProxyGenerator extends AbstractProcessor {
     this.elements = this.processingEnv.getElementUtils();
     this.types = this.processingEnv.getTypeUtils();
     TypeElement adviseBy = this.getTypeElement(ADVISE_BY);
-    this.before = this.getTypeElement(BEFORE);
-    this.around = this.getTypeElement(AROUND);
-    this.afterThrowing = this.getTypeElement(AFTER_THROWING);
-    this.afterReturning = this.getTypeElement(AFTER_RETURNING);
-    this.afterFinally = this.getTypeElement(AFTER_FINALLY);
+    TypeElement before = this.getTypeElement(BEFORE);
+    this.beforeType = before.asType();
+    TypeElement around = this.getTypeElement(AROUND);
+    this.aroundType = around.asType();
+    TypeElement afterThrowing = this.getTypeElement(AFTER_THROWING);
+    this.afterThrowingType = afterThrowing.asType();
+    TypeElement afterReturning = this.getTypeElement(AFTER_RETURNING);
+    this.afterReturningType = afterReturning.asType();
+    TypeElement afterFinally = this.getTypeElement(AFTER_FINALLY);
+    this.afterFinallyType = afterFinally.asType();
     this.adviseByValueMethod = getValueMethod(adviseBy);
     this.intType = this.types.getPrimitiveType(TypeKind.INT);
     this.longType = this.types.getPrimitiveType(TypeKind.LONG);
@@ -319,23 +324,23 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private List<ExecutableElement> getBeforeMethods(TypeElement aspect) {
-    return getMethodsAnnotatedWith(aspect, this.before);
+    return getMethodsAnnotatedWith(aspect, this.beforeType);
   }
 
   private List<ExecutableElement> getAfterReturningMethods(TypeElement aspect) {
-    return getMethodsAnnotatedWith(aspect, this.afterReturning);
+    return getMethodsAnnotatedWith(aspect, this.afterReturningType);
   }
 
   private List<ExecutableElement> getAfterFinallyMethods(TypeElement aspect) {
-    return getMethodsAnnotatedWith(aspect, this.afterFinally);
+    return getMethodsAnnotatedWith(aspect, this.afterFinallyType);
   }
 
   private List<ExecutableElement> getAroundMethods(TypeElement aspect) {
-    return getMethodsAnnotatedWith(aspect, this.around);
+    return getMethodsAnnotatedWith(aspect, this.aroundType);
   }
 
   private List<ExecutableElement> getAfterThrowingMethods(TypeElement aspect) {
-    return getMethodsAnnotatedWith(aspect, this.afterThrowing);
+    return getMethodsAnnotatedWith(aspect, this.afterThrowingType);
   }
 
   private List<ExecutableElement> getMethodsToImplement(TypeElement targetClass) {
@@ -405,6 +410,22 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
+  private LocalVariableContext buildLocalVariables(boolean isVoid, AdviceMethods adviceMethods) {
+    boolean needsReturnValue;
+    if (isVoid) {
+      needsReturnValue = false;
+    } else {
+      needsReturnValue = doMethodsNeedReturnValue(adviceMethods);
+    }
+    // TODO check for method names
+    String returnVariableName = needsReturnValue ? "returnValue" : null;
+    boolean hasExectionTimeMillis = hasParameterWithAnnotation(adviceMethods.getAfterReturningMethods(), this.executionTimeMillisType);
+    boolean hasExectionTimeNanos = hasParameterWithAnnotation(adviceMethods.getAfterReturningMethods(), this.executionTimeNanosType);
+    String exectionTimeMillisName = hasExectionTimeMillis ? "exectionTimeMillis" : null;
+    String exectionTimeNanosName = hasExectionTimeNanos ? "exectionTimeNanos" : null;
+    return new LocalVariableContext(returnVariableName, exectionTimeMillisName, exectionTimeNanosName);
+  }
+
   private JoinpointContext implementMethod(ProxyToGenerate proxyToGenerate,
           Builder proxyClassBilder, TargetObjectContext targetObjectContext, ExecutableElement methodToImplement) {
 
@@ -412,27 +433,26 @@ public class ProxyGenerator extends AbstractProcessor {
 
     AdviceMethods adviceMethods = getAdviceMethods(proxyToGenerate);
     boolean isVoid = methodToImplement.getReturnType().getKind() == TypeKind.VOID;
-    boolean needsReturnValue;
-    if (isVoid) {
-      needsReturnValue = false;
-    } else {
-      needsReturnValue = doMethodsNeedReturnValue(adviceMethods);
-    }
+    LocalVariableContext localVariables = buildLocalVariables(isVoid, adviceMethods);
 
     com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(methodToImplement);
-    JoinpointContext joinpointContext;
-    if (needsReturnValue) {
-      joinpointContext = new JoinpointContext(targetClass, methodToImplement, targetObjectContext, "returnValue", methodBuilder);
-    } else {
-      joinpointContext = new JoinpointContext(targetClass, methodToImplement, targetObjectContext, methodBuilder);
-    }
-
+    JoinpointContext joinpointContext = new JoinpointContext(targetClass, methodToImplement, targetObjectContext, localVariables, methodBuilder);
     // @Before
     addBeforeMethods(adviceMethods, joinpointContext);
 
-    if (needsReturnValue) {
+    // millis and nanos
+    if (localVariables.hasExectionTimeMillis()) {
+      String variableName = localVariables.getExectionTimeMillisName();
+      methodBuilder.addStatement("$T $N = $T.currentTimeMillis()", long.class, variableName, java.lang.System.class);
+    }
+    if (localVariables.hasExectionTimeNanos()) {
+      String variableName = localVariables.getExectionTimeNanosName();
+      methodBuilder.addStatement("$T $N = $T.nanoTime()", long.class, variableName, java.lang.System.class);
+    }
+
+    if (localVariables.hasReturnValueVariable()) {
       // returnVariableName = this.targetObject.joinpoint();
-      String returnVariableName = joinpointContext.getReturnVariableName();
+      String returnVariableName = joinpointContext.getLocalVariables().getReturnVariableName();
       TypeMirror returnType = methodToImplement.getReturnType();
       String methodName = methodToImplement.getSimpleName().toString();
       if (adviceMethods.getAroundMethods().isEmpty()) {
@@ -450,13 +470,23 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
 
+
+    // millis and nanos
+    if (localVariables.hasExectionTimeMillis()) {
+      String variableName = localVariables.getExectionTimeMillisName();
+      methodBuilder.addStatement("$N = $T.currentTimeMillis() - $N", variableName, java.lang.System.class, variableName);
+    }
+    if (localVariables.hasExectionTimeNanos()) {
+      String variableName = localVariables.getExectionTimeNanosName();
+      methodBuilder.addStatement("$N = $T.nanoTime() - $N", variableName, java.lang.System.class, variableName);
+    }
     // @AfterReturningMethod
     addAfterReturningMethods(adviceMethods, joinpointContext);
 
     // return
-    if (needsReturnValue) {
+    if (localVariables.hasReturnValueVariable()) {
       // return returnVariableName;
-      methodBuilder.addStatement("return " + joinpointContext.getReturnVariableName());
+      methodBuilder.addStatement("return " + joinpointContext.getLocalVariables().getReturnVariableName());
     } else {
       String delegateCall = buildDelegateCall("this.targetObject." + methodToImplement.getSimpleName(), methodToImplement);
       if (isVoid) {
@@ -669,20 +699,21 @@ public class ProxyGenerator extends AbstractProcessor {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
-        if (hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturning)) {
+        if (!hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturningType)) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ReturnValue is only available for @AfterReturning");
           return argument;
         }
+        argument = buildReturnValueArgument(adviceContext);
       } else if (isSameType(annotationType, this.executionTimeMillisType)) { // @ExecutionTimeMillis
         if (argument != null) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
-        if (hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturning)) {
+        if (!hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturningType)) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeMillis is only available for @AfterReturning");
           return argument;
         }
-        if (isSameType(adviceParameter, this.longType)) {
+        if (!isSameType(adviceParameter, this.longType)) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeMillis must be of type long");
           return argument;
         }
@@ -693,11 +724,11 @@ public class ProxyGenerator extends AbstractProcessor {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "more than one injection annotation present on: " + adviceParameter);
           return argument;
         }
-        if (hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturning)) {
+        if (!hasAnnotationMirror(adviceContext.getAdviceMethod(), this.afterReturningType)) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeNanos is only available for @AfterReturning");
           return argument;
         }
-        if (isSameType(adviceParameter, this.longType)) {
+        if (!isSameType(adviceParameter, this.longType)) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "@ExecutionTimeNanos must be of type long");
           return argument;
         }
@@ -726,14 +757,17 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private Argument buildReturnValueArgument(AdviceContext adviceContext) {
-    return new Argument(adviceContext.getJoinpointContext().getReturnVariableName());
+    LocalVariableContext localVariables = adviceContext.getJoinpointContext().getLocalVariables();
+    return new Argument(localVariables.getReturnVariableName());
   }
 
   private Argument buildExectionTimeMillisArgument(AdviceContext adviceContext) {
-    return new Argument(adviceContext.getJoinpointContext().getExectionTimeMillisName());
+    LocalVariableContext localVariables = adviceContext.getJoinpointContext().getLocalVariables();
+    return new Argument(localVariables.getExectionTimeMillisName());
   }
   private Argument buildExectionTimeNanosArgument(AdviceContext adviceContext) {
-    return new Argument(adviceContext.getJoinpointContext().getExectionTimeNanosName());
+    LocalVariableContext localVariables = adviceContext.getJoinpointContext().getLocalVariables();
+    return new Argument(localVariables.getExectionTimeNanosName());
   }
 
   private Argument buildArgumentsArgument(AdviceContext adviceContext) {
@@ -775,10 +809,27 @@ public class ProxyGenerator extends AbstractProcessor {
                     || !adviceMethods.getAroundMethods().isEmpty();
   }
 
-  private boolean hasAnnotationMirror(ExecutableElement adviceMethod, TypeElement typeElement) {
-    for (AnnotationMirror mirror : this.elements.getAllAnnotationMirrors(typeElement)) {
-      TypeMirror expectedAnnotationType = typeElement.asType();
+  private boolean hasAnnotationMirror(Element element, TypeMirror expectedAnnotationType) {
+    for (AnnotationMirror mirror : this.elements.getAllAnnotationMirrors(element)) {
       if (this.types.isSameType(mirror.getAnnotationType(), expectedAnnotationType)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasParameterWithAnnotation(List<ExecutableElement> methods, TypeMirror expectedAnnotation) {
+    for (ExecutableElement method : methods) {
+      if (hasParameterWithAnnotation(method, expectedAnnotation)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasParameterWithAnnotation(ExecutableElement method, TypeMirror expectedAnnotation) {
+    for (VariableElement parameter : method.getParameters()) {
+      if (hasAnnotationMirror(parameter, expectedAnnotation)) {
         return true;
       }
     }
@@ -969,8 +1020,7 @@ public class ProxyGenerator extends AbstractProcessor {
     return this.evaluator.evaluate(expression, targetClass, joinpoint);
   }
 
-  private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement type, TypeElement annotation) {
-    TypeMirror annotationType = annotation.asType();
+  private List<ExecutableElement> getMethodsAnnotatedWith(TypeElement type, TypeMirror annotationType) {
     List<ExecutableElement> methods = new ArrayList<>();
     for (Element member : this.elements.getAllMembers(type)) {
       if (member.getKind() == ElementKind.METHOD) {
@@ -1117,21 +1167,70 @@ public class ProxyGenerator extends AbstractProcessor {
 
     private Set<String> methodConstants;
 
-    private Map<String, Integer> countsByName;
+    private Map<String, Integer> methodCountsByName;
 
     TargetObjectContext() {
       this.methodConstants = new HashSet<>();
-      this.countsByName = new HashMap<>();
+      this.methodCountsByName = new HashMap<>();
     }
 
     String generateMethodConstantName(String name) {
-      int existingCount = this.countsByName.getOrDefault(name, 0);
+      int existingCount = this.methodCountsByName.getOrDefault(name, 0);
       String generatedName = "M_" + name + '_' + existingCount;
       if (!this.methodConstants.add(generatedName)) {
         throw new IllegalStateException("name " + generatedName + " already present");
       }
-      this.countsByName.merge(name, 1, (existing, increment) -> existing + increment);
+      this.methodCountsByName.merge(name, 1, (existing, increment) -> existing + increment);
       return generatedName;
+    }
+
+  }
+
+  static final class LocalVariableContext {
+
+    private final String returnVariableName;
+
+    private final String exectionTimeMillisName;
+
+    private final String exectionTimeNanosName;
+
+    LocalVariableContext(String returnVariableName, String exectionTimeMillisName, String exectionTimeNanosName) {
+      this.returnVariableName = returnVariableName;
+      this.exectionTimeMillisName = exectionTimeMillisName;
+      this.exectionTimeNanosName = exectionTimeNanosName;
+    }
+
+    String getReturnVariableName() {
+      if (!this.hasReturnValueVariable()) {
+        throw new IllegalStateException("no return variable present");
+      }
+      return this.returnVariableName;
+    }
+
+    boolean hasReturnValueVariable() {
+      return this.returnVariableName != null;
+    }
+
+    boolean hasExectionTimeMillis() {
+      return this.exectionTimeMillisName != null;
+    }
+
+    String getExectionTimeMillisName() {
+      if (!this.hasExectionTimeMillis()) {
+        throw new IllegalStateException("no execution time millis variable present");
+      }
+      return this.exectionTimeMillisName;
+    }
+
+    boolean hasExectionTimeNanos() {
+      return this.exectionTimeNanosName != null;
+    }
+
+    String getExectionTimeNanosName() {
+      if (!this.hasExectionTimeNanos()) {
+        throw new IllegalStateException("no execution time nanos variable present");
+      }
+      return this.exectionTimeNanosName;
     }
 
   }
@@ -1141,19 +1240,15 @@ public class ProxyGenerator extends AbstractProcessor {
     private final TypeElement targetClassElement;
     private final ExecutableElement joinpointElement;
     private final TargetObjectContext targetObjectContext;
-    private final String returnVariableName;
+    private final LocalVariableContext localVariables;
     private String methodConstantName;
     private final com.squareup.javapoet.MethodSpec.Builder methodBuilder;
 
-    JoinpointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext, com.squareup.javapoet.MethodSpec.Builder methodBuilder) {
-      this(targetClassElement, joinpointElement, targetObjectContext, null, methodBuilder);
-    }
-
-    JoinpointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext, String returnVariableName, com.squareup.javapoet.MethodSpec.Builder methodBuilder) {
+    JoinpointContext(TypeElement targetClassElement, ExecutableElement joinpointElement, TargetObjectContext targetObjectContext, LocalVariableContext localVariables, com.squareup.javapoet.MethodSpec.Builder methodBuilder) {
       this.targetClassElement = targetClassElement;
       this.joinpointElement = joinpointElement;
       this.targetObjectContext = targetObjectContext;
-      this.returnVariableName = returnVariableName;
+      this.localVariables = localVariables;
       this.methodBuilder = methodBuilder;
     }
 
@@ -1163,6 +1258,10 @@ public class ProxyGenerator extends AbstractProcessor {
         this.methodConstantName = this.targetObjectContext.generateMethodConstantName(joinpointMethodName);
       }
       return this.methodConstantName;
+    }
+
+    LocalVariableContext getLocalVariables() {
+      return this.localVariables;
     }
 
     boolean hasMethodConstantName() {
@@ -1177,28 +1276,6 @@ public class ProxyGenerator extends AbstractProcessor {
       return this.joinpointElement;
     }
 
-    String getReturnVariableName() {
-      if (this.returnVariableName == null) {
-        throw new IllegalStateException("no return variable present");
-      }
-      return this.returnVariableName;
-    }
-
-    boolean needsExectionTimeMillis() {
-      return false;
-    }
-
-    String getExectionTimeMillisName() {
-      throw new IllegalStateException("not yet implemented");
-    }
-
-    boolean needsExectionTimeNanos() {
-      return false;
-    }
-
-    String getExectionTimeNanosName() {
-      throw new IllegalStateException("not yet implemented");
-    }
 
     boolean needsCatch() {
       return false;

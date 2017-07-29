@@ -12,7 +12,11 @@ public class ExecutionTimeMillisTest {
   public void noArgument() {
     CaptureExecutionTimeMillisAspect aspect = new CaptureExecutionTimeMillisAspect();
     InjectExecutionTimeMillis targetObject = () -> {
-      Thread.sleep(10L);
+      try {
+        Thread.sleep(10L);
+      } catch (InterruptedException e) {
+        throw new RuntimeException("interrupted", e);
+      }
       return "return value";
     };
     InjectExecutionTimeMillis proxy = new InjectExecutionTimeMillis_(targetObject, aspect);

@@ -11,8 +11,12 @@ public class ExecutionTimeNanosTest {
   @Test
   public void noArgument() {
     CaptureExecutionTimeNanosAspect aspect = new CaptureExecutionTimeNanosAspect();
-    InjectExecutionTimeMillis targetObject = () -> {
-      Thread.sleep(0L, 10);
+    InjectExecutionTimeNanos targetObject = () -> {
+      try {
+        Thread.sleep(0L, 10);
+      } catch (InterruptedException e) {
+        throw new RuntimeException("interrupted", e);
+      }
       return "return value";
     };
     InjectExecutionTimeNanos proxy = new InjectExecutionTimeNanos_(targetObject, aspect);
