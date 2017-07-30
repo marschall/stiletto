@@ -131,48 +131,44 @@ abstract class AbstractTransactionalAspect {
   }
 
   /**
-     * A {@link TransactionDefinition} delegating everything but the
-     * joinpoint identification to a {@link Transactional}.
-     */
-    protected static final class TransactionalTransactionDefinition implements TransactionDefinition {
+   * A {@link TransactionDefinition} delegating everything but the
+   * joinpoint identification to a {@link Transactional}.
+   */
+  protected static final class TransactionalTransactionDefinition implements TransactionDefinition {
 
-      private final Transactional transactional;
-      private final String joinpointIdentification;
+    private final Transactional transactional;
+    private final String joinpointIdentification;
 
-      TransactionalTransactionDefinition(Transactional transactional, String joinpointIdentification) {
-        this.transactional = transactional;
-        this.joinpointIdentification = joinpointIdentification;
-      }
-
-      @Override
-      public int getPropagationBehavior() {
-        return this.transactional.propagation().value();
-      }
-
-      @Override
-      public int getIsolationLevel() {
-        return this.transactional.isolation().value();
-      }
-
-      @Override
-      public int getTimeout() {
-        return this.transactional.timeout();
-      }
-
-      @Override
-      public boolean isReadOnly() {
-        return this.transactional.readOnly();
-      }
-
-      @Override
-      public String getName() {
-        return this.joinpointIdentification;
-      }
-
+    TransactionalTransactionDefinition(Transactional transactional, String joinpointIdentification) {
+      this.transactional = transactional;
+      this.joinpointIdentification = joinpointIdentification;
     }
 
-  public AbstractTransactionalAspect() {
-    super();
+    @Override
+    public int getPropagationBehavior() {
+      return this.transactional.propagation().value();
+    }
+
+    @Override
+    public int getIsolationLevel() {
+      return this.transactional.isolation().value();
+    }
+
+    @Override
+    public int getTimeout() {
+      return this.transactional.timeout();
+    }
+
+    @Override
+    public boolean isReadOnly() {
+      return this.transactional.readOnly();
+    }
+
+    @Override
+    public String getName() {
+      return this.joinpointIdentification;
+    }
+
   }
 
 }

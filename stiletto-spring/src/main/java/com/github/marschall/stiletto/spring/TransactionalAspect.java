@@ -57,6 +57,8 @@ public final class TransactionalAspect extends AbstractTransactionalAspect {
       // org.springframework.transaction.interceptor.TransactionAspectSupport.completeTransactionAfterThrowing(TransactionInfo, Throwable)
       if (rollbackOn(e, transactional)) {
         this.txManager.rollback(transaction);
+      } else {
+        this.txManager.commit(transaction);
       }
       throw e;
     }
