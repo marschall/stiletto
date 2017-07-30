@@ -31,9 +31,9 @@ public final class CallbackPreferringTransactionalAspect extends AbstractTransac
   @Around
   @Transactional
   @Matching(Transactional.class)
-  public Object invoke(@DeclaredAnnotation Transactional transactional,
+  public <R> R invoke(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
-          @MethodCall ActualMethodCall<?> call) {
+          @MethodCall ActualMethodCall<R> call) {
 
     TransactionDefinition definition = newTransactionDefinition(transactional, joinpointIdentification);
 
@@ -71,7 +71,9 @@ public final class CallbackPreferringTransactionalAspect extends AbstractTransac
       throw ((ErrorHolder) result).getError();
     }
 
-    return result;
+    // can only be R, RuntimeExceptionHolder or ErrorHolder
+    // and we already checked for RuntimeExceptionHolder and ErrorHolder
+    return (R) result;
   }
 
 

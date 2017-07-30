@@ -43,14 +43,14 @@ public final class TransactionalAspect extends AbstractTransactionalAspect {
   @Around
   @Transactional
   @Matching(Transactional.class)
-  public Object invoke(@DeclaredAnnotation Transactional transactional,
+  public <R> R invoke(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
-          @MethodCall ActualMethodCall<?> call) {
+          @MethodCall ActualMethodCall<R> call) {
 
     TransactionDefinition definition = newTransactionDefinition(transactional, joinpointIdentification);
     TransactionStatus transaction = this.txManager.getTransaction(definition);
 
-    Object result;
+    R result;
     try {
       result = call.invoke();
     } catch (Error | RuntimeException e) {
