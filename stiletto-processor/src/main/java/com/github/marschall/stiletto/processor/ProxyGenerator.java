@@ -311,7 +311,7 @@ public class ProxyGenerator extends AbstractProcessor {
         Set<Modifier> modifiers = member.getModifiers();
         if (modifiers.contains(FINAL) && !modifiers.contains(STATIC)) {
           // ignore final non-static methods from java.lang.Object
-          ExecutableElement method = (ExecutableElement) member;
+          ExecutableElement method = this.aptUtils.asExecutableElement(member);
           if (!isFinalObjectMethod(method)) {
             messager.printMessage(Kind.ERROR, "final methods can not be proxied", typeElement);
             valid = false;
@@ -805,9 +805,7 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private boolean doMethodsNeedReturnValue(AdviceMethods adviceMethods) {
-    return !adviceMethods.getAfterReturningMethods().isEmpty()
-                    || !adviceMethods.getAfterFinallyMethods().isEmpty()
-                    || !adviceMethods.getAroundMethods().isEmpty();
+    return !adviceMethods.getAfterReturningMethods().isEmpty();
   }
 
   private boolean hasAnnotationMirror(Element element, TypeMirror expectedAnnotationType) {
@@ -961,7 +959,7 @@ public class ProxyGenerator extends AbstractProcessor {
     String methodName = "value";
     for (Element member : typeElement.getEnclosedElements()) {
       if (member.getKind() == ElementKind.METHOD && member.getSimpleName().contentEquals(methodName)) {
-        ExecutableElement method = (ExecutableElement) member;
+        ExecutableElement method = this.aptUtils.asExecutableElement(member);
         if (method.getParameters().isEmpty()) {
           return method;
         }
@@ -978,8 +976,7 @@ public class ProxyGenerator extends AbstractProcessor {
     for (Element member : this.elements.getAllMembers(typeElement)) {
       if (member.getKind() == ElementKind.METHOD && isOverriable(member)) {
         if (member.getEnclosingElement().getKind() != ElementKind.INTERFACE) {
-          // TODO use method instead of case
-          ExecutableElement method = (ExecutableElement) member;
+          ExecutableElement method = this.aptUtils.asExecutableElement(member);
           if (!isOverridableObjectMethod(method)) {
             String methodName = method.getSimpleName().toString();
 
@@ -1029,8 +1026,7 @@ public class ProxyGenerator extends AbstractProcessor {
   private void addMethods(TypeElement typeElement, Map<String, Set<ExecutableElement>> interfaceMethods) {
     for (Element member : typeElement.getEnclosedElements()) {
       if (member.getKind() == ElementKind.METHOD && isOverriable(member)) {
-        // TODO use method instead of case
-        ExecutableElement method = (ExecutableElement) member;
+        ExecutableElement method = this.aptUtils.asExecutableElement(member);
         String methodName = method.getSimpleName().toString();
         Set<ExecutableElement> methodsWithSameName = interfaceMethods.computeIfAbsent(methodName, (key) -> new HashSet<>());
         methodsWithSameName.add(method);
@@ -1076,7 +1072,7 @@ public class ProxyGenerator extends AbstractProcessor {
       if (member.getKind() == ElementKind.METHOD) {
         for (AnnotationMirror mirror : member.getAnnotationMirrors()) {
           if (this.isSameType(mirror.getAnnotationType(), annotationType)) {
-            methods.add((ExecutableElement) member);
+            methods.add(this.aptUtils.asExecutableElement(member));
           }
         }
       }
