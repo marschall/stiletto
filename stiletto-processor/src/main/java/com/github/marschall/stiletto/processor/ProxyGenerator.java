@@ -449,14 +449,7 @@ public class ProxyGenerator extends AbstractProcessor {
     addBeforeMethods(adviceMethods, joinpointContext);
 
     // millis and nanos
-    if (localVariables.hasExectionTimeMillis()) {
-      String variableName = localVariables.getExectionTimeMillisName();
-      methodBuilder.addStatement("$T $N = $T.currentTimeMillis()", long.class, variableName, java.lang.System.class);
-    }
-    if (localVariables.hasExectionTimeNanos()) {
-      String variableName = localVariables.getExectionTimeNanosName();
-      methodBuilder.addStatement("$T $N = $T.nanoTime()", long.class, variableName, java.lang.System.class);
-    }
+    recordStartTime(joinpointContext);
 
     if (localVariables.hasReturnValueVariable()) {
       // returnVariableName = this.targetObject.joinpoint();
@@ -477,17 +470,9 @@ public class ProxyGenerator extends AbstractProcessor {
       }
     }
 
-
-
     // millis and nanos
-    if (localVariables.hasExectionTimeMillis()) {
-      String variableName = localVariables.getExectionTimeMillisName();
-      methodBuilder.addStatement("$N = $T.currentTimeMillis() - $N", variableName, java.lang.System.class, variableName);
-    }
-    if (localVariables.hasExectionTimeNanos()) {
-      String variableName = localVariables.getExectionTimeNanosName();
-      methodBuilder.addStatement("$N = $T.nanoTime() - $N", variableName, java.lang.System.class, variableName);
-    }
+
+    recordEndTime(joinpointContext);
     // @AfterReturningMethod
     addAfterReturningMethods(adviceMethods, joinpointContext);
 
@@ -508,6 +493,34 @@ public class ProxyGenerator extends AbstractProcessor {
 
     proxyClassBilder.addMethod(methodBuilder.build());
     return joinpointContext;
+  }
+
+  private void recordEndTime(JoinpointContext joinpointContext) {
+    LocalVariableContext localVariables = joinpointContext.getLocalVariables();
+    if (localVariables.hasExectionTimeMillis()) {
+      String variableName = localVariables.getExectionTimeMillisName();
+      joinpointContext.getMethodBuilder()
+        .addStatement("$N = $T.currentTimeMillis() - $N", variableName, java.lang.System.class, variableName);
+    }
+    if (localVariables.hasExectionTimeNanos()) {
+      String variableName = localVariables.getExectionTimeNanosName();
+      joinpointContext.getMethodBuilder()
+        .addStatement("$N = $T.nanoTime() - $N", variableName, java.lang.System.class, variableName);
+    }
+  }
+
+  private void recordStartTime(JoinpointContext joinpointContext) {
+    LocalVariableContext localVariables = joinpointContext.getLocalVariables();
+    if (localVariables.hasExectionTimeMillis()) {
+      String variableName = localVariables.getExectionTimeMillisName();
+      joinpointContext.getMethodBuilder()
+        .addStatement("$T $N = $T.currentTimeMillis()", long.class, variableName, java.lang.System.class);
+    }
+    if (localVariables.hasExectionTimeNanos()) {
+      String variableName = localVariables.getExectionTimeNanosName();
+      joinpointContext.getMethodBuilder()
+        .addStatement("$T $N = $T.nanoTime()", long.class, variableName, java.lang.System.class);
+    }
   }
 
   private void addAfterReturningMethods(AdviceMethods adviceMethods, JoinpointContext joinpointContext) {
