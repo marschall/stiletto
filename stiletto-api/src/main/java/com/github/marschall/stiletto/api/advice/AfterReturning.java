@@ -22,4 +22,7 @@ public @interface AfterReturning {
     // if void result is not changed
     // different annotation?
 
+  // TODO allow changing return value?
+  // TODO pass null for void? use optional for return value instead
+
 }
