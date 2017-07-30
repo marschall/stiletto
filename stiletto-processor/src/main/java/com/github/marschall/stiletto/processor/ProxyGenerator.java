@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -410,33 +411,40 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  private LocalVariableContext buildLocalVariables(boolean isVoid, AdviceMethods adviceMethods) {
+  private LocalVariableContext buildLocalVariables(ExecutableElement joinpointElement, AdviceMethods adviceMethods) {
     boolean needsReturnValue;
-    if (isVoid) {
+    if (isVoid(joinpointElement)) {
       needsReturnValue = false;
     } else {
       needsReturnValue = doMethodsNeedReturnValue(adviceMethods);
     }
-    // TODO check for method names
-    String returnVariableName = needsReturnValue ? "returnValue" : null;
+    Set<String> parameterNames = getParameterNames(joinpointElement);
+    String returnVariableName = needsReturnValue ? makeUnique("returnValue", parameterNames) : null;
     boolean hasExectionTimeMillis = hasParameterWithAnnotation(adviceMethods.getAfterReturningMethods(), this.executionTimeMillisType);
     boolean hasExectionTimeNanos = hasParameterWithAnnotation(adviceMethods.getAfterReturningMethods(), this.executionTimeNanosType);
-    String exectionTimeMillisName = hasExectionTimeMillis ? "exectionTimeMillis" : null;
-    String exectionTimeNanosName = hasExectionTimeNanos ? "exectionTimeNanos" : null;
+    String exectionTimeMillisName = hasExectionTimeMillis ? makeUnique("exectionTimeMillis", parameterNames) : null;
+    String exectionTimeNanosName = hasExectionTimeNanos ? makeUnique("exectionTimeNanos", parameterNames) : null;
     return new LocalVariableContext(returnVariableName, exectionTimeMillisName, exectionTimeNanosName);
   }
 
+  private static String makeUnique(String s, Set<String> set) {
+    String unique = s;
+    while (set.contains(unique)) {
+      unique = unique + '_';
+    }
+    return unique;
+  }
+
   private JoinpointContext implementMethod(ProxyToGenerate proxyToGenerate,
-          Builder proxyClassBilder, TargetObjectContext targetObjectContext, ExecutableElement methodToImplement) {
+          Builder proxyClassBilder, TargetObjectContext targetObjectContext, ExecutableElement joinpointElement) {
 
     TypeElement targetClass = proxyToGenerate.getTargetClassElement();
 
     AdviceMethods adviceMethods = getAdviceMethods(proxyToGenerate);
-    boolean isVoid = methodToImplement.getReturnType().getKind() == TypeKind.VOID;
-    LocalVariableContext localVariables = buildLocalVariables(isVoid, adviceMethods);
+    LocalVariableContext localVariables = buildLocalVariables(joinpointElement, adviceMethods);
 
-    com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(methodToImplement);
-    JoinpointContext joinpointContext = new JoinpointContext(targetClass, methodToImplement, targetObjectContext, localVariables, methodBuilder);
+    com.squareup.javapoet.MethodSpec.Builder methodBuilder = MethodSpec.overriding(joinpointElement);
+    JoinpointContext joinpointContext = new JoinpointContext(targetClass, joinpointElement, targetObjectContext, localVariables, methodBuilder);
     // @Before
     addBeforeMethods(adviceMethods, joinpointContext);
 
@@ -453,11 +461,11 @@ public class ProxyGenerator extends AbstractProcessor {
     if (localVariables.hasReturnValueVariable()) {
       // returnVariableName = this.targetObject.joinpoint();
       String returnVariableName = joinpointContext.getLocalVariables().getReturnVariableName();
-      TypeMirror returnType = methodToImplement.getReturnType();
-      String methodName = methodToImplement.getSimpleName().toString();
+      TypeMirror returnType = joinpointElement.getReturnType();
+      String methodName = joinpointElement.getSimpleName().toString();
       if (adviceMethods.getAroundMethods().isEmpty()) {
         // returnVariableName = this.targetObject.joinpoint();
-        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, methodToImplement), returnType, returnVariableName);
+        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, joinpointElement), returnType, returnVariableName);
       } else {
         // returnVariableName = this.aspect.joinpoint(new ActualMethodCall() {
         //     @Override
@@ -465,7 +473,7 @@ public class ProxyGenerator extends AbstractProcessor {
         //       return TargetClass.this.joinpoint();
         //     }
         // });
-        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, methodToImplement), returnType, returnVariableName);
+        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, joinpointElement), returnType, returnVariableName);
       }
     }
 
@@ -488,8 +496,8 @@ public class ProxyGenerator extends AbstractProcessor {
       // return returnVariableName;
       methodBuilder.addStatement("return " + joinpointContext.getLocalVariables().getReturnVariableName());
     } else {
-      String delegateCall = buildDelegateCall("this.targetObject." + methodToImplement.getSimpleName(), methodToImplement);
-      if (isVoid) {
+      String delegateCall = buildDelegateCall("this.targetObject." + joinpointElement.getSimpleName(), joinpointElement);
+      if (joinpointContext.isVoid()) {
         // this.targetObject.joinpoint();
         methodBuilder.addStatement(delegateCall);
       } else {
@@ -1103,6 +1111,17 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
 
+  static boolean isVoid(ExecutableElement method) {
+    return method.getReturnType().getKind() == TypeKind.VOID;
+  }
+
+  private static Set<String> getParameterNames(ExecutableElement method) {
+    return method.getParameters().stream()
+            .map(v -> v.getSimpleName().toString())
+            .collect(Collectors.toSet());
+
+  }
+
   private boolean isOverridableObjectMethod(ExecutableElement method) {
     Name methodName = method.getSimpleName();
     if (methodName.contentEquals("finalize")) {
@@ -1321,6 +1340,10 @@ public class ProxyGenerator extends AbstractProcessor {
         this.methodConstantName = this.targetObjectContext.generateMethodConstantName(joinpointMethodName);
       }
       return this.methodConstantName;
+    }
+
+    boolean isVoid() {
+      return ProxyGenerator.isVoid(this.joinpointElement);
     }
 
     LocalVariableContext getLocalVariables() {
