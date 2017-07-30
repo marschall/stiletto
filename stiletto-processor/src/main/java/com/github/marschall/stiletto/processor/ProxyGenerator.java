@@ -1210,8 +1210,9 @@ public class ProxyGenerator extends AbstractProcessor {
     List<ExecutableElement> aroundMethods = getAroundMethods(aspectType);
     List<ExecutableElement> afterReturningMethods = getAfterReturningMethods(aspectType);
     List<ExecutableElement> afterFinallyMethods = getAfterFinallyMethods(aspectType);
+    List<ExecutableElement> afterThrowingMethods = getAfterThrowingMethods(aspectType);
 
-    return new AdviceMethods(beforeMethods, aroundMethods, afterReturningMethods, afterFinallyMethods);
+    return new AdviceMethods(beforeMethods, aroundMethods, afterReturningMethods, afterFinallyMethods, afterThrowingMethods);
   }
 
   static final class AdviceMethods {
@@ -1220,12 +1221,14 @@ public class ProxyGenerator extends AbstractProcessor {
     private final List<ExecutableElement> aroundMethods;
     private final List<ExecutableElement> afterReturningMethods;
     private final List<ExecutableElement> afterFinallyMethods;
+    private final List<ExecutableElement> afterThrowingMethods;
 
-    AdviceMethods(List<ExecutableElement> beforeMethods, List<ExecutableElement> aroundMethods, List<ExecutableElement> afterReturningMethods, List<ExecutableElement> afterFinallyMethods) {
+    AdviceMethods(List<ExecutableElement> beforeMethods, List<ExecutableElement> aroundMethods, List<ExecutableElement> afterReturningMethods, List<ExecutableElement> afterFinallyMethods, List<ExecutableElement> afterThrowingMethods) {
       this.beforeMethods = beforeMethods;
       this.aroundMethods = aroundMethods;
       this.afterReturningMethods = afterReturningMethods;
       this.afterFinallyMethods = afterFinallyMethods;
+      this.afterThrowingMethods = afterThrowingMethods;
     }
 
     List<ExecutableElement> getBeforeMethods() {
@@ -1242,6 +1245,10 @@ public class ProxyGenerator extends AbstractProcessor {
 
     List<ExecutableElement> getAfterFinallyMethods() {
       return this.afterFinallyMethods;
+    }
+
+    public List<ExecutableElement> getAfterThrowingMethods() {
+      return this.afterThrowingMethods;
     }
 
   }
