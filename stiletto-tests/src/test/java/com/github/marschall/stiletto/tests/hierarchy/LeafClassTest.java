@@ -1,5 +1,7 @@
 package com.github.marschall.stiletto.tests.hierarchy;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -8,7 +10,8 @@ public class LeafClassTest {
 
   @Test
   public void isInterface() {
-    assertTrue(LeafClass_.class.isAssignableFrom(IntermediateInterface.class));
+    assertSame(Object.class, LeafClass_.class.getSuperclass());
+    assertArrayEquals(new Class[] {IntermediateInterface.class}, LeafClass_.class.getInterfaces());
   }
 
   @Test

@@ -160,10 +160,11 @@ public class ProxyGenerator extends AbstractProcessor {
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
     this.processingEnv = processingEnv;
-    this.addGenerated = true;
-
     this.elements = this.processingEnv.getElementUtils();
     this.types = this.processingEnv.getTypeUtils();
+    this.aptUtils = new AptUtils(this.types);
+    this.addGenerated = true;
+
     TypeElement adviseBy = this.getTypeElement(ADVISE_BY);
     TypeElement before = this.getTypeElement(BEFORE);
     this.beforeType = before.asType();
@@ -204,8 +205,6 @@ public class ProxyGenerator extends AbstractProcessor {
 
     this.namingStrategy = s -> s + "_";
     this.evaluator = new ExpressionEvaluator();
-
-    this.aptUtils = new AptUtils(this.types);
   }
 
   private TypeElement getTypeElement(CharSequence name) {
@@ -533,10 +532,9 @@ public class ProxyGenerator extends AbstractProcessor {
     } else if (isSubclassingRequired(targetClass)) {
       proxyClassBilder.superclass(TypeName.get(targetClass.asType()));
     } else {
-      for (TypeMirror superinterface : targetClass.getInterfaces()) {
+      for (TypeMirror superinterface : this.collectSuperInterfaces(targetClass)) {
         proxyClassBilder.addSuperinterface(TypeName.get(superinterface));
       }
-      // TODO check interfaces from superclasses
       List<? extends TypeParameterElement> typeParameters = targetClass.getTypeParameters();
       if (!typeParameters.isEmpty()) {
         for (TypeParameterElement typeParameter : typeParameters) {
@@ -544,6 +542,25 @@ public class ProxyGenerator extends AbstractProcessor {
         }
       }
     }
+  }
+
+  private List<TypeMirror> collectSuperInterfaces(TypeElement typeElement) {
+    List<TypeMirror> interfaces = new ArrayList<>(2);
+    Set<String> alreadyAdded = new HashSet<>(4);
+
+    TypeElement clazz = typeElement;
+    while (!this.isSameType(clazz, this.objectType)) {
+      for (TypeMirror superinterface : clazz.getInterfaces()) {
+        String qualifiedName = this.aptUtils.getQualifiedName(this.types.asElement(superinterface));
+        if (alreadyAdded.add(qualifiedName)) {
+          interfaces.add(superinterface);
+        }
+      }
+
+      clazz = this.aptUtils.asTypeElement(this.types.asElement(clazz.getSuperclass()));
+    }
+
+    return interfaces;
   }
 
   private void addClassHeader(ProxyToGenerate proxyToGenerate, Builder proxyClassBilder) {
