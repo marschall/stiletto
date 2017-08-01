@@ -55,4 +55,11 @@ not proxied:
 -- clone
 -- finalize, pointless
 
+Unsure:
+- use Supplier instead of ActualMethodCall
+- use Function<Object[], R> instead of ChangeableMethodCall
 
+org.springframework.aop.support.AopUtils.isAopProxy(Object)
+
+Advisor
+Advised

@@ -6,7 +6,6 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.nio.charset.IllegalCharsetNameException;
-import java.util.IllegalFormatException;
 
 import org.junit.Test;
 import org.springframework.transaction.TransactionDefinition;

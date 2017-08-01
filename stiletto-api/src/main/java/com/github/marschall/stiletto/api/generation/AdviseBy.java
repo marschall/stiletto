@@ -15,6 +15,7 @@ import java.lang.annotation.Target;
 @Repeatable(AdviseByAll.class)
 public @interface AdviseBy {
 
+  // configures the advisor
   // TODO also method?
   // TODO name pattern expression?
   // TODO on aspect instead? probably no, aspect should stay generic
