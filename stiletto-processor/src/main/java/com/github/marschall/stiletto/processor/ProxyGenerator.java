@@ -52,6 +52,7 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 
+import com.github.marschall.stiletto.processor.ProxyGenerator.Statement;
 import com.github.marschall.stiletto.processor.el.Joinpoint;
 import com.github.marschall.stiletto.processor.el.TargetClass;
 import com.squareup.javapoet.AnnotationSpec;
@@ -157,6 +158,8 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private Types types;
 
+  private boolean addSpringSupport;
+
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
@@ -165,6 +168,7 @@ public class ProxyGenerator extends AbstractProcessor {
     this.types = this.processingEnv.getTypeUtils();
     this.aptUtils = new AptUtils(this.types);
     this.addGenerated = true;
+    this.addSpringSupport = processingEnv.getOptions().getOrDefault("stiletto.spring", "false").equals("true");
 
     TypeElement adviseBy = this.getTypeElement(ADVISE_BY);
     TypeElement before = this.getTypeElement(BEFORE);
@@ -204,7 +208,12 @@ public class ProxyGenerator extends AbstractProcessor {
     TypeElement executionTimeNanosElement = this.getTypeElement(EXECUTION_TIME_NANOS);
     this.executionTimeNanosType = executionTimeNanosElement.asType();
 
-    this.namingStrategy = s -> s + "_";
+    if (this.addSpringSupport) {
+      // look like a cglib proxy to spring
+      this.namingStrategy = s -> s + "$$_";
+    } else {
+      this.namingStrategy = s -> s + "_";
+    }
     this.evaluator = new ExpressionEvaluator();
   }
 
@@ -458,15 +467,19 @@ public class ProxyGenerator extends AbstractProcessor {
       String methodName = joinpointElement.getSimpleName().toString();
       if (adviceMethods.getAroundMethods().isEmpty()) {
         // returnVariableName = this.targetObject.joinpoint();
-        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, joinpointElement), returnType, returnVariableName);
+        methodBuilder.addStatement("$T $N = this.$N" + buildDelegateCall(methodName, joinpointElement), returnType, returnVariableName, "targetObject");
       } else {
+        ExecutableElement aroundMethod = adviceMethods.getAroundMethods().get(0);
+
         // returnVariableName = this.aspect.joinpoint(new ActualMethodCall() {
         //     @Override
         //     public R invoke() {
         //       return TargetClass.this.joinpoint();
         //     }
         // });
-        methodBuilder.addStatement("$T $N = " + buildDelegateCall("this.targetObject." + methodName, joinpointElement), returnType, returnVariableName);
+        AdviceContext adviceContext = new AdviceContext(aroundMethod, joinpointContext);
+        Statement buildAdviceCall = this.buildAdviceCall(adviceContext);
+        methodBuilder.addStatement("$T $N = this.$N" + buildDelegateCall(methodName, joinpointElement), returnType, returnVariableName, "aspect");
       }
     }
 
@@ -627,6 +640,15 @@ public class ProxyGenerator extends AbstractProcessor {
     }
   }
 
+  private void addSpringSupport(Builder proxyClassBilder, ProxyToGenerate proxyToGenerate) {
+    proxyClassBilder.addSuperinterface(asTypeName("org.springframework.aop.SpringProxy"));
+    proxyClassBilder.addSuperinterface(asTypeName("org.springframework.aop.framework.Advised"));
+  }
+
+  private TypeName asTypeName(CharSequence name) {
+    return TypeName.get(this.elements.getTypeElement(name).asType());
+  }
+
   private void addMethodConstants(Builder proxyClassBilder, ProxyToGenerate proxyToGenerate, List<MethodConstant> methodConstants) {
     if (methodConstants.isEmpty()) {
       return;
@@ -682,8 +704,9 @@ public class ProxyGenerator extends AbstractProcessor {
   private Statement buildAdviceCall(AdviceContext adviceContext) {
     StringBuilder buffer = new StringBuilder();
     ExecutableElement adviceMethod = adviceContext.getAdviceMethod();
-    List<Object> arguments = new ArrayList<>(adviceMethod.getParameters().size());
-    buffer.append("this.aspect.");
+    List<Object> arguments = new ArrayList<>(adviceMethod.getParameters().size() + 1);
+    buffer.append("this.$N.");
+    arguments.add("aspect");
     buffer.append(adviceMethod.getSimpleName());
     buffer.append('(');
     boolean first = true;
@@ -942,16 +965,16 @@ public class ProxyGenerator extends AbstractProcessor {
   }
 
   private static String buildSuperCall(ExecutableElement constructor) {
-    return buildDelegateCall("super", constructor);
+    return "super" + buildDelegateCall("", constructor);
   }
 
-  private static String buildDelegateCall(String receiver, ExecutableElement method) {
+  private static String buildDelegateCall(String methodName, ExecutableElement method) {
     List<? extends VariableElement> parameters = method.getParameters();
     if (parameters.isEmpty()) {
-      return receiver + "()";
+      return methodName + "()";
     }
     StringBuilder buffer = new StringBuilder();
-    buffer.append(receiver);
+    buffer.append(methodName);
     buffer.append('(');
     boolean first = true;
     for (VariableElement parameter : parameters) {

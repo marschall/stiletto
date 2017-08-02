@@ -24,7 +24,7 @@ import com.github.marschall.stiletto.spring.AspectJDumpTest.AspectJCacheableServ
 public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$2703a4e5 extends AspectJCacheableService implements SpringProxy, Advised, Factory {
   private boolean CGLIB$BOUND;
   public static Object CGLIB$FACTORY_DATA;
-  private static /* final */ ThreadLocal CGLIB$THREAD_CALLBACKS;
+  private static /* final */ ThreadLocal<Callback[]> CGLIB$THREAD_CALLBACKS;
   private static /* final */ Callback[] CGLIB$STATIC_CALLBACKS;
   private MethodInterceptor CGLIB$CALLBACK_0;
   private MethodInterceptor CGLIB$CALLBACK_1;
@@ -51,52 +51,48 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
   private static /* final */ MethodProxy CGLIB$clone$6$Proxy;
 
   static void CGLIB$STATICHOOK5() {
-    CGLIB$THREAD_CALLBACKS = new ThreadLocal();
+    CGLIB$THREAD_CALLBACKS = new ThreadLocal<>();
     CGLIB$emptyArgs = new Object[0];
     try {
-      Class var0 = Class.forName(
+      Class<?> proxyClass = Class.forName(
               "com.github.marschall.stiletto.spring.AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$2703a4e5");
-      Class var1;
+      Class<?> lookupClass;
       Method[] var10000 = ReflectUtils.findMethods(
-              new String[] { "equals", "(Ljava/lang/Object;)Z", "toString",
-                  "()Ljava/lang/String;", "hashCode", "()I", "clone",
-              "()Ljava/lang/Object;" },
-              (var1 = Class.forName("java.lang.Object")).getDeclaredMethods());
+              new String[] {
+                  "equals", "(Ljava/lang/Object;)Z",
+                  "toString", "()Ljava/lang/String;",
+                  "hashCode", "()I",
+                  "clone", "()Ljava/lang/Object;" },
+              (lookupClass = Class.forName("java.lang.Object")).getDeclaredMethods());
       CGLIB$equals$3$Method = var10000[0];
-      CGLIB$equals$3$Proxy = MethodProxy.create(var1, var0,
-              "(Ljava/lang/Object;)Z", "equals", "CGLIB$equals$3");
+      CGLIB$equals$3$Proxy = MethodProxy.create(lookupClass, proxyClass, "(Ljava/lang/Object;)Z", "equals", "CGLIB$equals$3");
       CGLIB$toString$4$Method = var10000[1];
-      CGLIB$toString$4$Proxy = MethodProxy.create(var1, var0,
-              "()Ljava/lang/String;", "toString", "CGLIB$toString$4");
+      CGLIB$toString$4$Proxy = MethodProxy.create(lookupClass, proxyClass, "()Ljava/lang/String;", "toString", "CGLIB$toString$4");
       CGLIB$hashCode$5$Method = var10000[2];
-      CGLIB$hashCode$5$Proxy = MethodProxy.create(var1, var0, "()I", "hashCode",
-              "CGLIB$hashCode$5");
+      CGLIB$hashCode$5$Proxy = MethodProxy.create(lookupClass, proxyClass, "()I", "hashCode", "CGLIB$hashCode$5");
       CGLIB$clone$6$Method = var10000[3];
-      CGLIB$clone$6$Proxy = MethodProxy.create(var1, var0,
-              "()Ljava/lang/Object;", "clone", "CGLIB$clone$6");
-      var10000 = ReflectUtils.findMethods(new String[] { "cacheable",
-          "(Ljava/lang/String;)Ljava/lang/String;", "cachePut",
-          "(Ljava/lang/Long;)V", "cacheEvict", "(Ljava/lang/Integer;)V" },
-              (var1 = Class.forName(
-                      "com.github.marschall.stiletto.spring.AspectJDumpTest$AspectJCacheableService"))
-              .getDeclaredMethods());
+      CGLIB$clone$6$Proxy = MethodProxy.create(lookupClass, proxyClass, "()Ljava/lang/Object;", "clone", "CGLIB$clone$6");
+      var10000 = ReflectUtils.findMethods(new String[] {
+          "cacheable", "(Ljava/lang/String;)Ljava/lang/String;",
+          "cachePut", "(Ljava/lang/Long;)V",
+          "cacheEvict", "(Ljava/lang/Integer;)V" },
+              (lookupClass = Class.forName("com.github.marschall.stiletto.spring.AspectJDumpTest$AspectJCacheableService")).getDeclaredMethods());
       CGLIB$cacheable$0$Method = var10000[0];
-      CGLIB$cacheable$0$Proxy = MethodProxy.create(var1, var0,
+      CGLIB$cacheable$0$Proxy = MethodProxy.create(lookupClass, proxyClass,
               "(Ljava/lang/String;)Ljava/lang/String;", "cacheable",
               "CGLIB$cacheable$0");
       CGLIB$cachePut$1$Method = var10000[1];
-      CGLIB$cachePut$1$Proxy = MethodProxy.create(var1, var0,
-              "(Ljava/lang/Long;)V", "cachePut", "CGLIB$cachePut$1");
+      CGLIB$cachePut$1$Proxy = MethodProxy.create(lookupClass, proxyClass, "(Ljava/lang/Long;)V", "cachePut", "CGLIB$cachePut$1");
       CGLIB$cacheEvict$2$Method = var10000[2];
-      CGLIB$cacheEvict$2$Proxy = MethodProxy.create(var1, var0,
+      CGLIB$cacheEvict$2$Proxy = MethodProxy.create(lookupClass, proxyClass,
               "(Ljava/lang/Integer;)V", "cacheEvict", "CGLIB$cacheEvict$2");
     } catch (ClassNotFoundException e) {
       throw new RuntimeException("coule not load class", e);
     }
   }
 
-  final String CGLIB$cacheable$0(String var1) {
-    return super.cacheable(var1);
+  final String CGLIB$cacheable$0(String s) {
+    return super.cacheable(s);
   }
 
   public final String cacheable(String s) {
@@ -171,7 +167,7 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
     return super.equals(var1);
   }
 
-  public final boolean equals(Object o) {
+  public final boolean equals(Object obj) {
     try {
       MethodInterceptor interceptor = this.CGLIB$CALLBACK_5;
       if (this.CGLIB$CALLBACK_5 == null) {
@@ -180,10 +176,10 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
       }
 
       if (interceptor != null) {
-        Object var4 = interceptor.intercept(this, CGLIB$equals$3$Method, new Object[] { o }, CGLIB$equals$3$Proxy);
-        return var4 == null ? false : ((Boolean) var4).booleanValue();
+        Object var4 = interceptor.intercept(this, CGLIB$equals$3$Method, new Object[] { obj }, CGLIB$equals$3$Proxy);
+        return var4 == null ? false : (Boolean) var4;
       } else {
-        return super.equals(o);
+        return super.equals(obj);
       }
     } catch (Error | RuntimeException e) {
       throw e;
@@ -254,51 +250,53 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
         interceptor = this.CGLIB$CALLBACK_0;
       }
 
-      return interceptor != null ? interceptor.intercept(this, CGLIB$clone$6$Method,
-              CGLIB$emptyArgs, CGLIB$clone$6$Proxy) : super.clone();
-    } catch (Error | CloneNotSupportedException | RuntimeException var1) {
-      throw var1;
-    } catch (Throwable var2) {
-      throw new UndeclaredThrowableException(var2);
+      if (interceptor != null) {
+        return interceptor.intercept(this, CGLIB$clone$6$Method, CGLIB$emptyArgs, CGLIB$clone$6$Proxy);
+      } else {
+        return super.clone();
+      }
+    } catch (Error | CloneNotSupportedException | RuntimeException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new UndeclaredThrowableException(e);
     }
   }
 
-  public static MethodProxy CGLIB$findMethodProxy(Signature var0) {
-    String var10000 = var0.toString();
-    switch (var10000.hashCode()) {
+  public static MethodProxy CGLIB$findMethodProxy(Signature sig) {
+    String signature = sig.toString();
+    switch (signature.hashCode()) {
       case -1112830115:
-        if (var10000
-                .equals("cacheable(Ljava/lang/String;)Ljava/lang/String;")) {
+        if (signature.equals("cacheable(Ljava/lang/String;)Ljava/lang/String;")) {
           return CGLIB$cacheable$0$Proxy;
         }
         break;
       case -673782903:
-        if (var10000.equals("cacheEvict(Ljava/lang/Integer;)V")) {
+        if (signature.equals("cacheEvict(Ljava/lang/Integer;)V")) {
           return CGLIB$cacheEvict$2$Proxy;
         }
         break;
       case -508378822:
-        if (var10000.equals("clone()Ljava/lang/Object;")) {
+        if (signature.equals("clone()Ljava/lang/Object;")) {
           return CGLIB$clone$6$Proxy;
         }
         break;
       case 1567110247:
-        if (var10000.equals("cachePut(Ljava/lang/Long;)V")) {
+        if (signature.equals("cachePut(Ljava/lang/Long;)V")) {
           return CGLIB$cachePut$1$Proxy;
         }
         break;
       case 1826985398:
-        if (var10000.equals("equals(Ljava/lang/Object;)Z")) {
+        if (signature.equals("equals(Ljava/lang/Object;)Z")) {
           return CGLIB$equals$3$Proxy;
         }
         break;
       case 1913648695:
-        if (var10000.equals("toString()Ljava/lang/String;")) {
+        if (signature.equals("toString()Ljava/lang/String;")) {
           return CGLIB$toString$4$Proxy;
         }
         break;
       case 1984935277:
-        if (var10000.equals("hashCode()I")) {
+        if (signature.equals("hashCode()I")) {
           return CGLIB$hashCode$5$Proxy;
         }
     }
@@ -306,23 +304,7 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
     return null;
   }
 
-  public final int indexOf(Advisor var1) {
-    try {
-      Dispatcher var10000 = this.CGLIB$CALLBACK_4;
-      if (this.CGLIB$CALLBACK_4 == null) {
-        CGLIB$BIND_CALLBACKS(this);
-        var10000 = this.CGLIB$CALLBACK_4;
-      }
-
-      return ((Advised) var10000.loadObject()).indexOf(var1);
-    } catch (Error | RuntimeException e) {
-      throw e;
-    } catch (Throwable e) {
-      throw new UndeclaredThrowableException(e);
-    }
-  }
-
-  public final int indexOf(Advice var1) {
+  public final int indexOf(Advisor advisor) {
     try {
       Dispatcher dispatcher = this.CGLIB$CALLBACK_4;
       if (this.CGLIB$CALLBACK_4 == null) {
@@ -330,7 +312,23 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
         dispatcher = this.CGLIB$CALLBACK_4;
       }
 
-      return ((Advised) dispatcher.loadObject()).indexOf(var1);
+      return ((Advised) dispatcher.loadObject()).indexOf(advisor);
+    } catch (Error | RuntimeException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new UndeclaredThrowableException(e);
+    }
+  }
+
+  public final int indexOf(Advice advisor) {
+    try {
+      Dispatcher dispatcher = this.CGLIB$CALLBACK_4;
+      if (this.CGLIB$CALLBACK_4 == null) {
+        CGLIB$BIND_CALLBACKS(this);
+        dispatcher = this.CGLIB$CALLBACK_4;
+      }
+
+      return ((Advised) dispatcher.loadObject()).indexOf(advisor);
     } catch (Error | RuntimeException e) {
       throw e;
     } catch (Throwable e) {
@@ -347,10 +345,10 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
       }
 
       return ((Advised) var10000.loadObject()).isFrozen();
-    } catch (Error | RuntimeException var1) {
-      throw var1;
-    } catch (Throwable var2) {
-      throw new UndeclaredThrowableException(var2);
+    } catch (Error | RuntimeException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new UndeclaredThrowableException(e);
     }
   }
 
@@ -363,10 +361,10 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
       }
 
       ((Advised) var10000.loadObject()).setTargetSource(var1);
-    } catch (Error | RuntimeException var2) {
-      throw var2;
-    } catch (Throwable var3) {
-      throw new UndeclaredThrowableException(var3);
+    } catch (Error | RuntimeException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new UndeclaredThrowableException(e);
     }
   }
 
@@ -379,10 +377,10 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
       }
 
       return ((Advised) var10000.loadObject()).getTargetSource();
-    } catch (Error | RuntimeException var1) {
-      throw var1;
-    } catch (Throwable var2) {
-      throw new UndeclaredThrowableException(var2);
+    } catch (Error | RuntimeException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new UndeclaredThrowableException(e);
     }
   }
 
@@ -395,10 +393,10 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
       }
 
       return ((Advised) var10000.loadObject()).isProxyTargetClass();
-    } catch (Error | RuntimeException var1) {
-      throw var1;
-    } catch (Throwable var2) {
-      throw new UndeclaredThrowableException(var2);
+    } catch (Error | RuntimeException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new UndeclaredThrowableException(e);
     }
   }
 
@@ -411,10 +409,10 @@ public class AspectJDumpTest$AspectJCacheableService$$EnhancerBySpringCGLIB$$270
       }
 
       ((Advised) dispatcher.loadObject()).addAdvisor(advisor);
-    } catch (Error | /* AopConfigException | */ RuntimeException var2) {
-      throw var2;
-    } catch (Throwable var3) {
-      throw new UndeclaredThrowableException(var3);
+    } catch (Error | /* AopConfigException | */ RuntimeException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw new UndeclaredThrowableException(e);
     }
   }
 
