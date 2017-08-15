@@ -1,7 +1,7 @@
 package com.github.marschall.stiletto.tests.advice;
 
 import com.github.marschall.stiletto.api.advice.Around;
-import com.github.marschall.stiletto.api.invocation.ActualMethodCallWithoutResult;
+import com.github.marschall.stiletto.api.invocation.ActualMethodCall;
 
 public class AroundWithoutReturnValueOrArgumentsAspect {
 
@@ -14,7 +14,7 @@ public class AroundWithoutReturnValueOrArgumentsAspect {
   }
 
   @Around
-  public void round(ActualMethodCallWithoutResult call) {
+  public void round(ActualMethodCall<?> call) {
     this.beforePassed = true;
     call.invoke();
     this.afterPassed = true;

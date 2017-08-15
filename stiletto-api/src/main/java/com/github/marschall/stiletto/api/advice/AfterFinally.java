@@ -12,4 +12,6 @@ import java.lang.annotation.Target;
 @Target(METHOD)
 public @interface AfterFinally {
 
+  // TODO allow return value? in case of exception: null, optional?
+
 }

@@ -1,6 +1,6 @@
 package com.github.marschall.stiletto.tests.hierarchy;
 
-abstract class IntermediateClass implements IntermediateInterface {
+abstract class IntermediateClassSameInterface implements IntermediateInterface {
 
   @Override
   public String simpleMethod() {

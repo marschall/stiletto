@@ -9,11 +9,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.CallbackPreferringPlatformTransactionManager;
 
 import com.github.marschall.stiletto.api.advice.Around;
-import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.injection.MethodCall;
-import com.github.marschall.stiletto.api.invocation.ActualMethodCallWithResult;
+import com.github.marschall.stiletto.api.invocation.ActualMethodCall;
+import com.github.marschall.stiletto.api.pointcut.Matching;
 
 /**
  * Reimplementation of {@link org.springframework.transaction.interceptor.TransactionInterceptor}.
@@ -42,15 +42,15 @@ public final class TransactionalAspect extends AbstractTransactionalAspect {
 
   @Around
   @Transactional
-  @WithAnnotationMatching(Transactional.class)
-  public Object invoke(@DeclaredAnnotation Transactional transactional,
+  @Matching(Transactional.class)
+  public <R> R invoke(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
-          @MethodCall ActualMethodCallWithResult<?> call) {
+          @MethodCall ActualMethodCall<R> call) {
 
     TransactionDefinition definition = this.newTransactionDefinition(transactional, joinpointIdentification);
     TransactionStatus transaction = this.txManager.getTransaction(definition);
 
-    Object result;
+    R result;
     try {
       result = call.invoke();
     } catch (Error | RuntimeException e) {

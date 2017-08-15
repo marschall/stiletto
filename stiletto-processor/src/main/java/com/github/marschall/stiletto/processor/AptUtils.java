@@ -72,9 +72,12 @@ final class AptUtils {
     return type.accept(DeclaredTypeExtractor.INSTANCE, null);
   }
 
-
   TypeElement asTypeElement(Element element) {
     return element.accept(TypeElementExtractor.INSTANCE, null);
+  }
+
+  ExecutableElement asExecutableElement(Element element) {
+    return element.accept(ExecutableElementExtractor.INSTANCE, null);
   }
 
   TypeMirror asTypeMirror(AnnotationValue annotationValue) {
@@ -116,6 +119,17 @@ final class AptUtils {
 
     @Override
     public TypeElement visitType(TypeElement e, Void p) {
+      return e;
+    }
+
+  }
+
+  static final class ExecutableElementExtractor extends ExpectedElementExtractor<ExecutableElement> {
+
+    static final ElementVisitor<ExecutableElement, Void> INSTANCE = new ExecutableElementExtractor();
+
+    @Override
+    public ExecutableElement visitExecutable(ExecutableElement e, Void p) {
       return e;
     }
 

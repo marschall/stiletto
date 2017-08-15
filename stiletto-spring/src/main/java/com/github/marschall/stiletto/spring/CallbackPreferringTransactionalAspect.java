@@ -9,11 +9,11 @@ import org.springframework.transaction.support.CallbackPreferringPlatformTransac
 import org.springframework.transaction.support.TransactionCallback;
 
 import com.github.marschall.stiletto.api.advice.Around;
-import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.injection.MethodCall;
-import com.github.marschall.stiletto.api.invocation.ActualMethodCallWithResult;
+import com.github.marschall.stiletto.api.invocation.ActualMethodCall;
+import com.github.marschall.stiletto.api.pointcut.Matching;
 
 /**
  * Reimplementation of {@link org.springframework.transaction.interceptor.TransactionInterceptor}
@@ -30,10 +30,10 @@ public final class CallbackPreferringTransactionalAspect extends AbstractTransac
 
   @Around
   @Transactional
-  @WithAnnotationMatching(Transactional.class)
-  public Object invoke(@DeclaredAnnotation Transactional transactional,
+  @Matching(Transactional.class)
+  public <R> R invoke(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
-          @MethodCall ActualMethodCallWithResult<?> call) {
+          @MethodCall ActualMethodCall<R> call) {
 
     TransactionDefinition definition = newTransactionDefinition(transactional, joinpointIdentification);
 
@@ -71,7 +71,9 @@ public final class CallbackPreferringTransactionalAspect extends AbstractTransac
       throw ((ErrorHolder) result).getError();
     }
 
-    return result;
+    // can only be R, RuntimeExceptionHolder or ErrorHolder
+    // and we already checked for RuntimeExceptionHolder and ErrorHolder
+    return (R) result;
   }
 
 

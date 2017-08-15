@@ -9,7 +9,7 @@ import com.github.marschall.stiletto.tests.BeforeCountingAspect;
 
 public class SimpleAdvisedInterfaceImplTest {
 
-  private SimpleAdvisedInterfaceImpl proxy;
+  private SimpleAdvisedInterface proxy;
   private BeforeCountingAspect aspect;
 
   @Before
