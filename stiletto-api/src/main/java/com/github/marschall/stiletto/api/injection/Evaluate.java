@@ -3,7 +3,6 @@ package com.github.marschall.stiletto.api.injection;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -38,7 +37,6 @@ import java.lang.annotation.Target;
  *
  * @see <a href="https://jcp.org/en/jsr/detail?id=341">JSR-341</a>
  */
-@Documented
 @Retention(RUNTIME)
 @Target(PARAMETER)
 public @interface Evaluate {

@@ -13,8 +13,10 @@ import java.lang.annotation.Target;
 public @interface AfterThrowing {
 
   // TODO default Exception?
-  Class<? extends Throwable>[] values() default Throwable.class;
+  // TODO could in theory be inferred from @Thrown
+  Class<? extends Throwable>[] value() default Throwable.class;
 
-  boolean onDeclared() default false;
+  // TODO
+//  boolean onDeclared() default false;
 
 }

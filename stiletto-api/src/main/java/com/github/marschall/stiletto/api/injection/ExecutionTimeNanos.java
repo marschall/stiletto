@@ -3,7 +3,6 @@ package com.github.marschall.stiletto.api.injection;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -22,7 +21,6 @@ import com.github.marschall.stiletto.api.advice.AfterThrowing;
  * @see <a href="https://shipilev.net/blog/2014/nanotrusting-nanotime/">Nanotrusting the Nanotime</a>
  * @see System#nanoTime()
  */
-@Documented
 @Retention(RUNTIME)
 @Target(PARAMETER)
 public @interface ExecutionTimeNanos {

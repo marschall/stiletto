@@ -47,7 +47,7 @@ public final class TransactionalAspect extends AbstractTransactionalAspect {
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification,
           @MethodCall ActualMethodCallWithResult<?> call) {
 
-    TransactionDefinition definition = newTransactionDefinition(transactional, joinpointIdentification);
+    TransactionDefinition definition = this.newTransactionDefinition(transactional, joinpointIdentification);
     TransactionStatus transaction = this.txManager.getTransaction(definition);
 
     Object result;
@@ -57,6 +57,8 @@ public final class TransactionalAspect extends AbstractTransactionalAspect {
       // org.springframework.transaction.interceptor.TransactionAspectSupport.completeTransactionAfterThrowing(TransactionInfo, Throwable)
       if (rollbackOn(e, transactional)) {
         this.txManager.rollback(transaction);
+      } else {
+        this.txManager.commit(transaction);
       }
       throw e;
     }

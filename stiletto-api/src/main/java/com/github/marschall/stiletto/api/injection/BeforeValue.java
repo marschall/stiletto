@@ -8,8 +8,8 @@ import java.lang.annotation.Target;
 
 @Retention(RUNTIME)
 @Target(PARAMETER)
-public @interface DeclaredAnnotation {
+public @interface BeforeValue {
 
-  // on class or method
+  // TODO better name
 
 }
