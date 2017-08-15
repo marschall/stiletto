@@ -11,11 +11,11 @@ import org.springframework.transaction.support.CallbackPreferringPlatformTransac
 import com.github.marschall.stiletto.api.advice.AfterReturning;
 import com.github.marschall.stiletto.api.advice.AfterThrowing;
 import com.github.marschall.stiletto.api.advice.Before;
-import com.github.marschall.stiletto.api.advice.WithAnnotationMatching;
 import com.github.marschall.stiletto.api.injection.BeforeValue;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.injection.Thrown;
+import com.github.marschall.stiletto.api.pointcut.Matching;
 
 public class TransactionalAspect2 extends AbstractTransactionalAspect {
 
@@ -31,7 +31,7 @@ public class TransactionalAspect2 extends AbstractTransactionalAspect {
 
   @Before
   @Transactional
-  @WithAnnotationMatching(Transactional.class)
+  @Matching(Transactional.class)
   public TransactionStatus beginTransaction(@DeclaredAnnotation Transactional transactional,
           @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String joinpointIdentification) {
 
@@ -41,14 +41,14 @@ public class TransactionalAspect2 extends AbstractTransactionalAspect {
 
   @AfterReturning
   @Transactional
-  @WithAnnotationMatching(Transactional.class)
+  @Matching(Transactional.class)
   public void commitTransaction(@BeforeValue TransactionStatus transaction) {
     this.txManager.commit(transaction);
   }
 
   @AfterThrowing(RuntimeException.class)
   @Transactional
-  @WithAnnotationMatching(Transactional.class)
+  @Matching(Transactional.class)
   public void onException(@BeforeValue TransactionStatus transaction,
           @DeclaredAnnotation Transactional transactional,
           @Thrown RuntimeException e) {
@@ -58,7 +58,7 @@ public class TransactionalAspect2 extends AbstractTransactionalAspect {
 
   @AfterThrowing(Error.class)
   @Transactional
-  @WithAnnotationMatching(Transactional.class)
+  @Matching(Transactional.class)
   public void onError(@BeforeValue TransactionStatus transaction,
           @DeclaredAnnotation Transactional transactional,
           @Thrown Error e) {

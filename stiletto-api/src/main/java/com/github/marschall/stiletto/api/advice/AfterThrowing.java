@@ -14,7 +14,7 @@ public @interface AfterThrowing {
 
   // TODO default Exception?
   // TODO could in theory be inferred from @Thrown
-  Class<? extends Throwable>[] values() default {RuntimeException.class, Error.class};
+  Class<? extends Throwable>[] value() default {RuntimeException.class, Error.class};
 
   // TODO
 //  boolean onDeclared() default false;
