@@ -63,9 +63,11 @@
               <version>${project.version}</version>
             </path>
           </annotationProcessorPaths>
+          <!-- 
           <compilerArguments>
             <stiletto.spring>true</stiletto.spring>
           </compilerArguments>
+           -->
         </configuration>
       </plugin>
     </plugins>

@@ -466,7 +466,7 @@ public class ProxyGenerator extends AbstractProcessor {
       String methodName = joinpointElement.getSimpleName().toString();
       if (adviceMethods.getAroundMethods().isEmpty()) {
         // returnVariableName = this.targetObject.joinpoint();
-        methodBuilder.addStatement("$T $N = this.$N" + buildDelegateCall(methodName, joinpointElement), returnType, returnVariableName, "targetObject");
+        methodBuilder.addStatement("$T $N = this.$N." + buildDelegateCall(methodName, joinpointElement), returnType, returnVariableName, "targetObject");
       } else {
         ExecutableElement aroundMethod = adviceMethods.getAroundMethods().get(0);
 
