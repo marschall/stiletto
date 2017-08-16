@@ -12,8 +12,8 @@ import com.github.marschall.stiletto.api.advice.AfterThrowing;
 
 /**
  * Marks a parameter of type {@code long} to be the execution time in
- * milliseconds of a method. Provides millisecond precision, but not
- * necessarily millisecond resolution.
+ * milliseconds of the joinpoint method. Provides millisecond
+ * precision, but not necessarily millisecond resolution.
  * <p>
  * Can be used in methods annotated with {@link AfterReturning},
  * {@link AfterThrowing} or {@link AfterFinally}.

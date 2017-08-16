@@ -10,4 +10,7 @@ import java.lang.annotation.Target;
 @Target(PARAMETER)
 public @interface Thrown {
 
+  // TODO Optional<>? vs null
+  // TODO make optional, infer from type
+
 }

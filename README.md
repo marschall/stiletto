@@ -29,6 +29,7 @@ Advantages of avoiding @Around
 - cleaner stack trace, only one additional frame with the same method name as joinpoint
 - easier to debug, one intermediate method less
 - no allocation
+- boxing and unboxing primitives can be avoided
 
 Annotations
 - @Annotations
