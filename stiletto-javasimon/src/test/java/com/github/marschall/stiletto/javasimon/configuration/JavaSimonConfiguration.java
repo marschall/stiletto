@@ -1,5 +1,7 @@
 package com.github.marschall.stiletto.javasimon.configuration;
 
+import org.javasimon.DisabledManager;
+import org.javasimon.Manager;
 import org.javasimon.spring.MonitoredMeasuringPointcut;
 import org.javasimon.spring.MonitoringInterceptor;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
@@ -15,9 +17,14 @@ import com.github.marschall.stiletto.javasimon.SimpleMonitoredService;
 public class JavaSimonConfiguration {
 
   @Bean
+  public Manager simonManager() {
+    return new DisabledManager();
+  }
+
+  @Bean
   public DefaultPointcutAdvisor monitoringAdvisor() {
     DefaultPointcutAdvisor monitoringAdvisor = new DefaultPointcutAdvisor();
-    monitoringAdvisor.setAdvice(new MonitoringInterceptor());
+    monitoringAdvisor.setAdvice(new MonitoringInterceptor(this.simonManager()));
     monitoringAdvisor.setPointcut(new MonitoredMeasuringPointcut());
     return monitoringAdvisor;
   }
