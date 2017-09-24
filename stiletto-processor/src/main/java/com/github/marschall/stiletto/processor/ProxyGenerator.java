@@ -430,9 +430,14 @@ public class ProxyGenerator extends AbstractProcessor {
     String returnVariableName = needsReturnValue ? makeUnique("returnValue", parameterNames) : null;
     boolean hasExectionTimeMillis = this.hasParameterWithAnnotation(adviceMethods.getAfterReturningMethods(), this.executionTimeMillisType);
     boolean hasExectionTimeNanos = this.hasParameterWithAnnotation(adviceMethods.getAfterReturningMethods(), this.executionTimeNanosType);
+
+    String exectionTimeMillisStartName = hasExectionTimeMillis ? makeUnique("exectionTimeMillisStart", parameterNames) : null;
     String exectionTimeMillisName = hasExectionTimeMillis ? makeUnique("exectionTimeMillis", parameterNames) : null;
+    String exectionTimeNanosStartName = hasExectionTimeNanos ? makeUnique("exectionTimeNanosStart", parameterNames) : null;
     String exectionTimeNanosName = hasExectionTimeNanos ? makeUnique("exectionTimeNanos", parameterNames) : null;
-    return new LocalVariableContext(returnVariableName, exectionTimeMillisName, exectionTimeNanosName);
+    return new LocalVariableContext(returnVariableName,
+            exectionTimeMillisStartName, exectionTimeMillisName,
+            exectionTimeNanosStartName, exectionTimeNanosName);
   }
 
   private static String makeUnique(String s, Set<String> set) {
@@ -510,26 +515,28 @@ public class ProxyGenerator extends AbstractProcessor {
   private void recordEndTime(JoinpointContext joinpointContext) {
     LocalVariableContext localVariables = joinpointContext.getLocalVariables();
     if (localVariables.hasExectionTimeMillis()) {
+      String startName = localVariables.getExectionTimeMillisStartName();
       String variableName = localVariables.getExectionTimeMillisName();
       joinpointContext.getMethodBuilder()
-        .addStatement("$N = $T.currentTimeMillis() - $N", variableName, java.lang.System.class, variableName);
+        .addStatement("$T $N = $T.currentTimeMillis() - $N", long.class, variableName, java.lang.System.class, startName);
     }
     if (localVariables.hasExectionTimeNanos()) {
+      String startName = localVariables.getExectionTimeNanosStartName();
       String variableName = localVariables.getExectionTimeNanosName();
       joinpointContext.getMethodBuilder()
-        .addStatement("$N = $T.nanoTime() - $N", variableName, java.lang.System.class, variableName);
+        .addStatement("$T $N = $T.nanoTime() - $N", long.class, variableName, java.lang.System.class, startName);
     }
   }
 
   private void recordStartTime(JoinpointContext joinpointContext) {
     LocalVariableContext localVariables = joinpointContext.getLocalVariables();
     if (localVariables.hasExectionTimeMillis()) {
-      String variableName = localVariables.getExectionTimeMillisName();
+      String variableName = localVariables.getExectionTimeMillisStartName();
       joinpointContext.getMethodBuilder()
         .addStatement("$T $N = $T.currentTimeMillis()", long.class, variableName, java.lang.System.class);
     }
     if (localVariables.hasExectionTimeNanos()) {
-      String variableName = localVariables.getExectionTimeNanosName();
+      String variableName = localVariables.getExectionTimeNanosStartName();
       joinpointContext.getMethodBuilder()
         .addStatement("$T $N = $T.nanoTime()", long.class, variableName, java.lang.System.class);
     }
@@ -1314,13 +1321,21 @@ public class ProxyGenerator extends AbstractProcessor {
 
     private final String returnVariableName;
 
+    private final String exectionTimeMillisStartName;
+
     private final String exectionTimeMillisName;
+
+    private final String exectionTimeNanosStartName;
 
     private final String exectionTimeNanosName;
 
-    LocalVariableContext(String returnVariableName, String exectionTimeMillisName, String exectionTimeNanosName) {
+    LocalVariableContext(String returnVariableName,
+            String exectionTimeMillisStartName, String exectionTimeMillisName,
+            String exectionTimeNanosStartName, String exectionTimeNanosName) {
       this.returnVariableName = returnVariableName;
+      this.exectionTimeMillisStartName = exectionTimeMillisStartName;
       this.exectionTimeMillisName = exectionTimeMillisName;
+      this.exectionTimeNanosStartName = exectionTimeNanosStartName;
       this.exectionTimeNanosName = exectionTimeNanosName;
     }
 
@@ -1335,6 +1350,17 @@ public class ProxyGenerator extends AbstractProcessor {
       return this.returnVariableName != null;
     }
 
+    boolean hasExectionTimeMillisStart() {
+      return this.exectionTimeMillisStartName != null;
+    }
+
+    String getExectionTimeMillisStartName() {
+      if (!this.hasExectionTimeMillis()) {
+        throw new IllegalStateException("no execution time millis variable present");
+      }
+      return this.exectionTimeMillisStartName;
+    }
+
     boolean hasExectionTimeMillis() {
       return this.exectionTimeMillisName != null;
     }
@@ -1344,6 +1370,17 @@ public class ProxyGenerator extends AbstractProcessor {
         throw new IllegalStateException("no execution time millis variable present");
       }
       return this.exectionTimeMillisName;
+    }
+
+    boolean hasExectionTimeNanosStart() {
+      return this.exectionTimeNanosStartName != null;
+    }
+
+    String getExectionTimeNanosStartName() {
+      if (!this.hasExectionTimeNanos()) {
+        throw new IllegalStateException("no execution time nanos variable present");
+      }
+      return this.exectionTimeNanosStartName;
     }
 
     boolean hasExectionTimeNanos() {
