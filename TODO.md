@@ -12,6 +12,9 @@
 - @Around for void
 - no alloc around
 - @ReturnValue on void method?
-
+- spring proxy compatibility
 - method selection on annotation
+- JavaSimon @Monitored
+-- have one method for name = "" and one for name() set
+-- add suffix() to string evaluation
 
