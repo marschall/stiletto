@@ -17,4 +17,5 @@
 - JavaSimon @Monitored
 -- have one method for name = "" and one for name() set
 -- add suffix() to string evaluation
+- should before method for @BeforeValue have corresponding annotation
 
