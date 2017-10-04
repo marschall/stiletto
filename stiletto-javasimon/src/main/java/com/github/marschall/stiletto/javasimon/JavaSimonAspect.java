@@ -60,13 +60,14 @@ public final class JavaSimonAspect {
     this(SimonManager.manager());
   }
 
-
   @Before
   @Monitored
   @Matching(Monitored.class)
   public Split start(
           @DeclaredAnnotation Monitored monitored,
-          @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String monitorName) {
+          @Evaluate("${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String defaultMonitorName) {
+    String configuredName = monitored.name();
+    String monitorName = configuredName.isEmpty() ? defaultMonitorName : configuredName;
     return this.manager.getStopwatch(monitorName).start();
   }
 
