@@ -61,6 +61,7 @@ import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
+import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeSpec.Builder;
@@ -489,7 +490,6 @@ public class ProxyGenerator extends AbstractProcessor {
 
         Statement adviceCall = this.buildAdviceCall("$T $N = ", adviceContext, returnType, returnVariableName);
         methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
-
       }
     }
 
@@ -504,13 +504,25 @@ public class ProxyGenerator extends AbstractProcessor {
       // return returnVariableName;
       methodBuilder.addStatement("return " + joinpointContext.getLocalVariables().getReturnVariableName());
     } else {
-      String delegateCall = buildDelegateCall("this.targetObject." + joinpointElement.getSimpleName(), joinpointElement);
-      if (joinpointContext.isVoid()) {
-        // this.targetObject.joinpoint();
-        methodBuilder.addStatement(delegateCall);
+      String methodName = joinpointElement.getSimpleName().toString();
+      if (adviceMethods.getAroundMethods().isEmpty()) {
+        if (joinpointContext.isVoid()) {
+          methodBuilder.addStatement(buildDelegateCall("this.$N." + methodName, joinpointElement), "targetObject");
+        } else {
+          methodBuilder.addStatement(buildDelegateCall("return this.$N." + methodName, joinpointElement), "targetObject");
+        }
       } else {
-        // return this.targetObject.joinpoint();
-        methodBuilder.addStatement("return " + delegateCall);
+        ExecutableElement aroundMethod = adviceMethods.getAroundMethods().get(0);
+
+        AdviceContext adviceContext = new AdviceContext(aroundMethod, joinpointContext);
+
+        Statement adviceCall;
+        if (joinpointContext.isVoid()) {
+          adviceCall = this.buildAdviceCall("", adviceContext);
+        } else {
+          adviceCall = this.buildAdviceCall("return ", adviceContext);
+        }
+        methodBuilder.addStatement(adviceCall.getFormat(), adviceCall.getArguments());
       }
     }
 
@@ -845,12 +857,13 @@ public class ProxyGenerator extends AbstractProcessor {
                   "more than one injection annotation present", adviceParameter);
           return argument;
         }
-        if (!this.elements.isFunctionalInterface(this.aptUtils.asTypeElement(adviceParameter))) {
+        TypeElement parameterType = this.aptUtils.asTypeElement(this.types.asElement(adviceParameter.asType()));
+        if (!this.elements.isFunctionalInterface(parameterType)) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "not a functional interface", adviceParameter);
           return argument;
         }
 
-        argument = buildMethodCallArgument(adviceParameter, adviceContext);
+        argument = buildMethodCallArgument(parameterType, adviceContext);
       }
     }
 
@@ -860,25 +873,29 @@ public class ProxyGenerator extends AbstractProcessor {
     return argument;
   }
 
-  private Argument buildMethodCallArgument(VariableElement adviceParameter, AdviceContext adviceContext) {
+  private Argument buildMethodCallArgument(TypeElement parameterType, AdviceContext adviceContext) {
     TargetObjectContext targetObjectContext = adviceContext.getJoinpointContext().getTargetObjectContext();
     ExecutableElement joinpointElement = adviceContext.getJoinpointContext().getJoinpointElement();
     String methodName = joinpointElement.getSimpleName().toString();
-    ExecutableElement aroundMethod = getSoleNonDefaultMethod(adviceParameter);
+    ExecutableElement aroundMethod = getSoleNonDefaultMethod(parameterType);
 
     // TODO add generic argument
-    // returnVariableName = this.aspect.joinpoint(new ActualMethodCall() {
+    // returnVariableName = this.aspect.joinpoint(new ActualMethodCall<R>() {
     //     @Override
     //     public R invoke() {
     //       return TargetClass.this.joinpoint();
     //     }
     // });
 
-    return new Argument("$T", TypeSpec.anonymousClassBuilder("")
-            .addSuperinterface(TypeName.get(adviceParameter.asType()))
+    ParameterizedTypeName superInterface = ParameterizedTypeName.get(
+            ClassName.get(parameterType),
+            TypeName.get(joinpointElement.getReturnType()));
+
+    return new Argument("$L", TypeSpec.anonymousClassBuilder("")
+            .addSuperinterface(superInterface)
             .addMethod(MethodSpec.overriding(aroundMethod)
                     // return this.targetObject.joinpoint();
-                    .addStatement("return $N.this.$N" + buildDelegateCall(methodName, joinpointElement), targetObjectContext.getProxyClassName(), "targetObject")
+                    .addStatement("return $N.this.$N." + buildDelegateCall(methodName, joinpointElement), targetObjectContext.getProxyClassName(), "targetObject")
                     .build())
             .build());
   }
@@ -1561,6 +1578,19 @@ public class ProxyGenerator extends AbstractProcessor {
 
     ExecutableElement getAdviceMethod() {
       return this.adviceMethod;
+    }
+
+  }
+
+  static final class AnnotationConstantKey {
+
+    private final AnnotationMirror annotation;
+
+    private final Map<String, AnnotationValue> values;
+
+    AnnotationConstantKey(AnnotationMirror annotation, Map<String, AnnotationValue> values) {
+      this.annotation = annotation;
+      this.values = values;
     }
 
   }
