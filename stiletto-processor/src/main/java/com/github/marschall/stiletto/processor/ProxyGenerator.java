@@ -879,7 +879,6 @@ public class ProxyGenerator extends AbstractProcessor {
     String methodName = joinpointElement.getSimpleName().toString();
     ExecutableElement aroundMethod = getSoleNonDefaultMethod(parameterType);
 
-    // TODO add generic argument
     // returnVariableName = this.aspect.joinpoint(new ActualMethodCall<R>() {
     //     @Override
     //     public R invoke() {
@@ -891,9 +890,12 @@ public class ProxyGenerator extends AbstractProcessor {
             ClassName.get(parameterType),
             TypeName.get(joinpointElement.getReturnType()));
 
+    DeclaredType callArgumentTtype = this.types.getDeclaredType(
+            parameterType, joinpointElement.getReturnType());
+
     return new Argument("$L", TypeSpec.anonymousClassBuilder("")
             .addSuperinterface(superInterface)
-            .addMethod(MethodSpec.overriding(aroundMethod)
+            .addMethod(MethodSpec.overriding(aroundMethod, callArgumentTtype, this.types)
                     // return this.targetObject.joinpoint();
                     .addStatement("return $N.this.$N." + buildDelegateCall(methodName, joinpointElement), targetObjectContext.getProxyClassName(), "targetObject")
                     .build())
