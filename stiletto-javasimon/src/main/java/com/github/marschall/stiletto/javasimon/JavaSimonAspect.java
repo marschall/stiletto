@@ -79,8 +79,8 @@ public final class JavaSimonAspect {
   @AfterReturning
   @Monitored
   @Matching(Monitored.class)
-  public Split stop(@BeforeValue Split split) {
-    return split.stop();
+  public void stop(@BeforeValue Split split) {
+    split.stop();
   }
 
   @AfterThrowing(RuntimeException.class)
