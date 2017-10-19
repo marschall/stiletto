@@ -2,8 +2,12 @@ package com.github.marschall.stiletto.jperf;
 
 import java.lang.reflect.Method;
 
+import com.github.marschall.stiletto.api.advice.AfterReturning;
+import com.github.marschall.stiletto.api.advice.AfterThrowing;
 import com.github.marschall.stiletto.api.advice.Before;
+import com.github.marschall.stiletto.api.injection.BeforeValue;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
+import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.pointcut.Matching;
 
 import net.jperf.LoggingStopWatch;
@@ -20,7 +24,7 @@ public abstract class AbstractJPerfAspect {
   @Before
   @Profiled
   @Matching(Profiled.class)
-  public LoggingStopWatch startStopWatc(@DeclaredAnnotation Profiled profiled) {
+  public LoggingStopWatch start(@DeclaredAnnotation Profiled profiled) {
 
     String loggerName = profiled.logger();
     if (loggerName == null) {
@@ -38,6 +42,82 @@ public abstract class AbstractJPerfAspect {
     stopWatch.setNormalAndSlowSuffixesEnabled(profiled.normalAndSlowSuffixesEnabled());
 
     return stopWatch;
+  }
+
+  @AfterReturning
+  @Profiled
+  @Matching(Profiled.class)
+  public void stop(
+          @Evaluate("tag.${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String defaultTag,
+          @Evaluate("message.${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String messageProperty,
+          @DeclaredAnnotation Profiled profiled,
+          @BeforeValue LoggingStopWatch stopWatch) {
+
+    String tag = getStopWatchTag(profiled, defaultTag);
+    String message = getStopWatchMessage(profiled, messageProperty);
+
+    if (profiled.logFailuresSeparately()) {
+        tag = tag + ".success";
+    }
+
+    stopWatch.stop(tag, message);
+  }
+
+  @AfterThrowing(RuntimeException.class)
+  @Profiled
+  @Matching(Profiled.class)
+  public void onException(
+          @Evaluate("tag.${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String defaultTag,
+          @Evaluate("message.${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String messageProperty,
+          @DeclaredAnnotation Profiled profiled,
+          @BeforeValue LoggingStopWatch stopWatch) {
+
+    stopOnFailure(defaultTag, messageProperty, profiled, stopWatch);
+  }
+
+  @AfterThrowing(Error.class)
+  @Profiled
+  @Matching(Profiled.class)
+  public void onError(
+          @Evaluate("tag.${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String defaultTag,
+          @Evaluate("message.${targetClass.fullyQualifiedName}.${joinpoint.methodName}") String messageProperty,
+          @DeclaredAnnotation Profiled profiled,
+          @BeforeValue LoggingStopWatch stopWatch) {
+
+    stopOnFailure(defaultTag, messageProperty, profiled, stopWatch);
+  }
+
+  private void stopOnFailure(String defaultTag, String messageProperty, Profiled profiled, LoggingStopWatch stopWatch) {
+    String tag = getStopWatchTag(profiled, defaultTag);
+    String message = getStopWatchMessage(profiled, messageProperty);
+
+    if (profiled.logFailuresSeparately()) {
+        tag = tag + ".failure";
+    }
+
+    stopWatch.stop(tag, message);
+  }
+
+  private static String getStopWatchTag(Profiled profiled, String defaultTag) {
+    String profiledTag = profiled.tag();
+    // we don't evaluate JEXL
+    if (Profiled.DEFAULT_TAG_NAME.equals(profiledTag)) {
+      return defaultTag;
+    } else {
+      return profiledTag;
+    }
+  }
+
+  private static String getStopWatchMessage(Profiled profiled, String messageProperty) {
+    String profiledMessage = profiled.message();
+    // we don't evaluate JEXL
+    if (profiledMessage.length() == 0) {
+      // look for properties-based default
+      // if the message name is not explicitly set on the Profiled annotation,
+      return JperfProperties.INSTANCE.getProperty(messageProperty);
+    } else {
+      return profiledMessage;
+    }
   }
 
   // copy and pasted
