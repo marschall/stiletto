@@ -36,6 +36,7 @@
     <module>stiletto-spring</module>
     <module>stiletto-tests</module>
     <module>stiletto-simon</module>
+    <module>stiletto-jperf</module>
   </modules>
 
   <developers>

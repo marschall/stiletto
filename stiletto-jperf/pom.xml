@@ -1,0 +1,52 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.github.marschall</groupId>
+    <artifactId>stiletto</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>stiletto-jperf</artifactId>
+  <name>Stiletto JPerf</name>
+
+  <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>stiletto-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.jperf</groupId>
+      <artifactId>jperf</artifactId>
+      <version>${jperf.version}</version>
+    </dependency>
+    
+    <!-- if you use the log4j implementation of jperf, you must also include this dependency -->
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>1.2.17</version>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- if you use the commons logging code (in the commonslog package), you must also include this dependency -->
+    <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
+      <version>1.2</version>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- if you use the slf4j logging code, you must also include this dependency -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.7.25</version>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+
+  <properties>
+    <jperf.version>1.0.3</jperf.version>
+  </properties>
+</project>
