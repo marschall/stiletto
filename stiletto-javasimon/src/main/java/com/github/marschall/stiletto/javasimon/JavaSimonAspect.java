@@ -14,6 +14,11 @@ import com.github.marschall.stiletto.api.injection.Evaluate;
 import com.github.marschall.stiletto.api.injection.Thrown;
 import com.github.marschall.stiletto.api.pointcut.Matching;
 
+/**
+ *
+ * @see org.javasimon.spring.MonitoringInterceptor
+ * @see org.javasimon.spring.MonitoredMeasuringPointcut
+ */
 public final class JavaSimonAspect {
 
   /**

@@ -7,6 +7,7 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>stiletto-javasimon</artifactId>
+  <name>Stiletto Java Simon</name>
 
   <dependencies>
     <dependency>
