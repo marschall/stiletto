@@ -18,6 +18,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
+import javax.lang.model.util.Elements;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.lang.model.util.SimpleElementVisitor8;
 import javax.lang.model.util.SimpleTypeVisitor8;
@@ -42,6 +43,10 @@ final class AptUtils {
       }
     }
     return false;
+  }
+
+  boolean isAnnotationMirror(AnnotationValue annotationValue) {
+    return annotationValue.accept(IsAnnotation.INSTANCE, null);
   }
 
   String getSignature(ExecutableElement executableElement) {
@@ -219,6 +224,34 @@ final class AptUtils {
         p.add(e);
       }
       return null;
+    }
+
+  }
+
+  static final class IsAnnotation extends SimpleAnnotationValueVisitor8<Boolean, Void> {
+
+    static final AnnotationValueVisitor<Boolean, Void> INSTANCE = new IsAnnotation();
+
+    @Override
+    protected Boolean defaultAction(Object o, Void p) {
+      return false;
+    }
+
+    @Override
+    public Boolean visitAnnotation(AnnotationMirror a, Void p) {
+      return true;
+    }
+
+  }
+
+  static final class IsAnnotationMirrorArray extends SimpleAnnotationValueVisitor8<Boolean, AnnotationMirror> {
+
+    static final AnnotationValueVisitor<Boolean, AnnotationMirror> INSTANCE = new IsAnnotationMirrorArray();
+
+    @Override
+    public Boolean visitArray(List<? extends AnnotationValue> values, AnnotationMirror p) {
+      // TODO Auto-generated method stub
+      return super.visitArray(values, p);
     }
 
   }

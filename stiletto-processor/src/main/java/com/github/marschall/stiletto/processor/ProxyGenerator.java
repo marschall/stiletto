@@ -857,7 +857,7 @@ public class ProxyGenerator extends AbstractProcessor {
                   "more than one injection annotation present", adviceParameter);
           return argument;
         }
-        TypeElement parameterType = this.aptUtils.asTypeElement(this.types.asElement(adviceParameter.asType()));
+        TypeElement parameterType = this.asTypeElement(adviceParameter.asType());
         if (!this.elements.isFunctionalInterface(parameterType)) {
           this.processingEnv.getMessager().printMessage(Kind.ERROR, "not a functional interface", adviceParameter);
           return argument;
@@ -1281,6 +1281,15 @@ public class ProxyGenerator extends AbstractProcessor {
       return this.isSameType(method.getParameters().get(0), this.objectType);
     }
     return false;
+  }
+
+  private boolean returnsAnnotation(ExecutableElement method) {
+    TypeMirror returnType = method.getReturnType();
+    // DeclaredType && TypeElement.getSuperclass == Annotation
+  }
+
+  private boolean returnsAnnotationArray(ExecutableElement method) {
+    TypeMirror returnType = method.getReturnType();
   }
 
   private boolean isFinalObjectMethod(ExecutableElement method) {
