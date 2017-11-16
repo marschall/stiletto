@@ -2,18 +2,18 @@ package com.github.marschall.stiletto.tests.injection;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.arrayWithSize;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class RepeatableAnnotationServiceTest {
 
   private RepeatableAnnotationAspect aspect;
   private RepeatableAnnotationService proxy;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     this.aspect = new RepeatableAnnotationAspect();
     RepeatableAnnotationService targetObject = new RepeatableAnnotationService();

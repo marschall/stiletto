@@ -1,16 +1,16 @@
 package com.github.marschall.stiletto.tests.advice;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class AfterThrowingAdvisedInterfaceTest {
 
   private AfterThrowingAspect aspect;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     this.aspect = new AfterThrowingAspect();
   }

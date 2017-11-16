@@ -2,8 +2,8 @@ package com.github.marschall.stiletto.demo.proxy;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -11,7 +11,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class InterfaceProxyTest {
 

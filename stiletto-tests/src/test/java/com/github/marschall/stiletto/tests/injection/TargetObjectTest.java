@@ -1,15 +1,15 @@
 package com.github.marschall.stiletto.tests.injection;
 
-import static org.junit.Assert.assertSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class TargetObjectTest {
 
   private TargetObjectAspect aspect;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     this.aspect = new TargetObjectAspect();
   }

@@ -1,9 +1,9 @@
 package com.github.marschall.stiletto.processor;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import com.github.marschall.stiletto.processor.el.Joinpoint;
 import com.github.marschall.stiletto.processor.el.TargetClass;
@@ -12,7 +12,7 @@ public class ExpressionEvaluatorTest {
 
   private ExpressionEvaluator expressionEvaluator;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     this.expressionEvaluator = new ExpressionEvaluator();
   }
