@@ -10,5 +10,4 @@ public class NoopTimingAspect extends ProfiledTimingAspect {
     return NoopLoggingStopWatch.INSTANCE;
   }
 
-
 }

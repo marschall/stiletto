@@ -2,7 +2,6 @@ package com.github.marschall.stiletto.tests.injection;
 
 import com.github.marschall.stiletto.api.advice.AfterReturning;
 import com.github.marschall.stiletto.api.injection.ExecutionTimeMillis;
-import com.github.marschall.stiletto.api.injection.ExecutionTimeNanos;
 
 public class CaptureExecutionTimeMillisAspect {
 

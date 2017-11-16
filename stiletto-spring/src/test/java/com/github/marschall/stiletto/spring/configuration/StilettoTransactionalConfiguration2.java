@@ -11,7 +11,7 @@ import com.github.marschall.stiletto.spring.SimpleTransactionalService_;
 import com.github.marschall.stiletto.spring.TransactionalAspect;
 
 @Configuration
-public class StilettoTransactionalConfiguration {
+public class StilettoTransactionalConfiguration2 {
 
   @Autowired
   private PlatformTransactionManager txManager;

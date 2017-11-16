@@ -1,10 +1,10 @@
 package com.github.marschall.stiletto.spring;
 
-import com.github.marschall.stiletto.spring.SimpleCacheableInterface;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
+
 import org.aopalliance.aop.Advice;
 import org.springframework.aop.Advisor;
 import org.springframework.aop.SpringProxy;

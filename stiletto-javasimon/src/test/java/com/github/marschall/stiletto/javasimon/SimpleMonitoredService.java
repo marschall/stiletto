@@ -2,7 +2,9 @@ package com.github.marschall.stiletto.javasimon;
 
 import org.javasimon.aop.Monitored;
 
-//@AdviseBy(JavaSimonAspect.class)
+import com.github.marschall.stiletto.api.generation.AdviseBy;
+
+@AdviseBy(JavaSimonAspect.class)
 public class SimpleMonitoredService implements SimpleMonitoredInterface {
 
   @Override

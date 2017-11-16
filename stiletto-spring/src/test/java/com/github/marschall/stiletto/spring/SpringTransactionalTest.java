@@ -8,9 +8,10 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.github.marschall.stiletto.spring.configuration.SpringTransactionalConfiguration;
+import com.github.marschall.stiletto.spring.configuration.TransactionManagerConfiguration;
 
 @Transactional
-@ContextConfiguration(classes = SpringTransactionalConfiguration.class)
+@ContextConfiguration(classes = {TransactionManagerConfiguration.class, SpringTransactionalConfiguration.class})
 public class SpringTransactionalTest extends AbstractSpringTest {
 
   @Autowired

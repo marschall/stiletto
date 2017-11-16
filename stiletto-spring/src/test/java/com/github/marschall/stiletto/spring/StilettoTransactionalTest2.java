@@ -7,12 +7,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.github.marschall.stiletto.spring.configuration.StilettoTransactionalConfiguration;
+import com.github.marschall.stiletto.spring.configuration.StilettoTransactionalConfiguration2;
 import com.github.marschall.stiletto.spring.configuration.TransactionManagerConfiguration;
 
 @Transactional
-@ContextConfiguration(classes = {TransactionManagerConfiguration.class, StilettoTransactionalConfiguration.class})
-public class StilettoTransactionalTest extends AbstractSpringTest {
+@ContextConfiguration(classes = {TransactionManagerConfiguration.class, StilettoTransactionalConfiguration2.class})
+public class StilettoTransactionalTest2 extends AbstractSpringTest {
 
   @Autowired
   private SimpleTransactionalInterface simpleService;
