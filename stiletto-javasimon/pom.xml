@@ -33,7 +33,6 @@
     <dependency>
       <groupId>org.aspectj</groupId>
       <artifactId>aspectjweaver</artifactId>
-      <version>1.8.10</version>
       <scope>test</scope>
     </dependency>
     <dependency>

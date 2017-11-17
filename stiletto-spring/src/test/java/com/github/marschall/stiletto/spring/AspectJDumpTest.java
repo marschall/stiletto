@@ -15,9 +15,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
-import com.github.marschall.stiletto.spring.configuration.SpringCacheableConfiguration;
+import com.github.marschall.stiletto.spring.SpringCacheableTest.SpringCacheableConfiguration;
+import com.github.marschall.stiletto.spring.configuration.CacheableConfiguration;
 
-@SpringJUnitConfig(SpringCacheableConfiguration.class)
+@SpringJUnitConfig({CacheableConfiguration.class, SpringCacheableConfiguration.class})
 //@ContextConfiguration(classes = AspectJCacheableService.class)
 public class AspectJDumpTest {
 
