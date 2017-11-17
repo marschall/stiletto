@@ -1941,7 +1941,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
     @Override
     public FormattedArguments visitChar(char c, TypeMirror p) {
-      return new FormattedArguments("$L", c);
+      return new FormattedArguments("'$L'", c);
     }
 
     @Override
@@ -1951,7 +1951,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
     @Override
     public FormattedArguments visitFloat(float f, TypeMirror p) {
-      return new FormattedArguments("$L", f);
+      return new FormattedArguments("$Lf", f);
     }
 
     @Override

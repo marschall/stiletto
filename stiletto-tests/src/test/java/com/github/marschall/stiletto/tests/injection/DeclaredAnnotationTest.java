@@ -46,7 +46,7 @@ public class DeclaredAnnotationTest {
     assertEquals(7.0d, annotation.doubleValue(), 0.0001d);
     assertEquals("8", annotation.stringValue());
     assertSame(BigDecimal.class, annotation.classValue());
-    assertSame(StandardOpenOption.APPEND, annotation.annotationValue());
+    assertSame(StandardOpenOption.APPEND, annotation.enumValue());
 
     assertArrayEquals(new boolean[] {true, false}, annotation.booleanValueArray());
     assertArrayEquals(new byte[] {9, 10}, annotation.byteValueArray());
@@ -58,7 +58,7 @@ public class DeclaredAnnotationTest {
     assertArrayEquals(new double[] {21, 22}, annotation.doubleValueArray(), 0.001d);
     assertArrayEquals(new String[] {"23", "24"}, annotation.stringValueArray());
     assertArrayEquals(new Class[] {Integer.class, Long.class}, annotation.classValueArray());
-    assertArrayEquals(new StandardOpenOption[] {StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.DSYNC}, annotation.annotationValueArray());
+    assertArrayEquals(new StandardOpenOption[] {StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.DSYNC}, annotation.enumValueArray());
 
     // TODO better assertion
     assertNotNull(annotation.annotationValue());
