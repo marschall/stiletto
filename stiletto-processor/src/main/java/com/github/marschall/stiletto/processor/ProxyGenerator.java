@@ -1973,9 +1973,9 @@ public class ProxyGenerator extends AbstractProcessor {
 
       StringBuilder buffer = new StringBuilder();
       ArrayType arrayType = this.aptUtils.asArrayType(p);
-      if (this.types.isAssignable(arrayType, this.classType)) {
+      if (this.types.isAssignable(this.types.erasure(arrayType.getComponentType()), this.classType)) {
         // avoid generic array creation
-        buffer.append("new ($T) $T {");
+        buffer.append("($T) new $T {");
         parameters.add(p);
         parameters.add(this.types.erasure(arrayType));
       } else {
