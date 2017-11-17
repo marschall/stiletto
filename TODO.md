@@ -8,6 +8,8 @@
 - add javadoc to proxy class constructors
 - better advice selection for primitive types
 - can @AfterReturning change return value?
+- can @AfterReturning change return value?
+- can @AfterThrowing stop exception propagation?
 - @Around should probably can change return value
 - @Around for void
 - no alloc around

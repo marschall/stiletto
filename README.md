@@ -27,8 +27,9 @@ Advantages
 ----------
 - annotations on target class can have retention source
 - minimize allocations
--- often intermediate allocations can be avoided
--- expressions can be evaluated at compile time and be a constant at runtime
+ - often intermediate allocations can be avoided
+ - expressions can be evaluated at compile time and be a constant at runtime
+- smaller, simpler methods -> easier to inline -> more likely to optimize
 
 Advantages of avoiding @Around
 -------------------------------
