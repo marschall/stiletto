@@ -18,7 +18,6 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVisitor;
-import javax.lang.model.util.Elements;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.lang.model.util.SimpleElementVisitor8;
 import javax.lang.model.util.SimpleTypeVisitor8;
@@ -43,10 +42,6 @@ final class AptUtils {
       }
     }
     return false;
-  }
-
-  boolean isAnnotationMirror(AnnotationValue annotationValue) {
-    return annotationValue.accept(IsAnnotation.INSTANCE, null);
   }
 
   String getSignature(ExecutableElement executableElement) {
@@ -122,6 +117,10 @@ final class AptUtils {
 
     static final ElementVisitor<TypeElement, Void> INSTANCE = new TypeElementExtractor();
 
+    private TypeElementExtractor() {
+      super();
+    }
+
     @Override
     public TypeElement visitType(TypeElement e, Void p) {
       return e;
@@ -133,6 +132,10 @@ final class AptUtils {
 
     static final ElementVisitor<ExecutableElement, Void> INSTANCE = new ExecutableElementExtractor();
 
+    private ExecutableElementExtractor() {
+      super();
+    }
+
     @Override
     public ExecutableElement visitExecutable(ExecutableElement e, Void p) {
       return e;
@@ -141,6 +144,10 @@ final class AptUtils {
   }
 
   static abstract class ExpectedTypeExtractor<R> extends SimpleTypeVisitor8<R, Void> {
+
+    private ExpectedTypeExtractor() {
+      super();
+    }
 
     @Override
     protected R defaultAction(TypeMirror e, Void p) {
@@ -153,6 +160,10 @@ final class AptUtils {
 
     static final TypeVisitor<DeclaredType, Void> INSTANCE = new DeclaredTypeExtractor();
 
+    private DeclaredTypeExtractor() {
+      super();
+    }
+
     @Override
     public DeclaredType visitDeclared(DeclaredType t, Void p) {
       return t;
@@ -161,6 +172,10 @@ final class AptUtils {
   }
 
   static abstract class ExpectedValueExtractor<R> extends SimpleAnnotationValueVisitor8<R, Void> {
+
+    private ExpectedValueExtractor() {
+      super();
+    }
 
     @Override
     protected R defaultAction(Object o, Void p) {
@@ -173,6 +188,10 @@ final class AptUtils {
 
     static final AnnotationValueVisitor<TypeMirror, Void> INSTANCE = new TypeMirrorExtractor();
 
+    private TypeMirrorExtractor() {
+      super();
+    }
+
     @Override
     public TypeMirror visitType(TypeMirror t, Void p) {
       return t;
@@ -183,6 +202,10 @@ final class AptUtils {
   static final class StringExtractor extends ExpectedValueExtractor<String> {
 
     static final AnnotationValueVisitor<String, Void> INSTANCE = new StringExtractor();
+
+    private StringExtractor() {
+      super();
+    }
 
     @Override
     public String visitString(String s, Void p) {
@@ -195,6 +218,10 @@ final class AptUtils {
 
     static final AnnotationValueVisitor<AnnotationMirror, Void> INSTANCE = new AnnotationMirrorExtractor();
 
+    private AnnotationMirrorExtractor() {
+      super();
+    }
+
     @Override
     public AnnotationMirror visitAnnotation(AnnotationMirror a, Void p) {
       return a;
@@ -205,6 +232,10 @@ final class AptUtils {
   static final class AnnotationsMirrorExtractor extends ExpectedValueExtractor<List<? extends AnnotationValue>> {
 
     static final AnnotationValueVisitor<List<? extends AnnotationValue>, Void> INSTANCE = new AnnotationsMirrorExtractor();
+
+    private AnnotationsMirrorExtractor() {
+      super();
+    }
 
     @Override
     public List<? extends AnnotationValue> visitArray(List<? extends AnnotationValue> vals, Void p) {
@@ -217,6 +248,10 @@ final class AptUtils {
 
     static final ElementVisitor<Void, List<ExecutableElement>> INSTANCE = new NonPrivateConstructorExtractor();
 
+    private NonPrivateConstructorExtractor() {
+      super();
+    }
+
     @Override
     public Void visitExecutable(ExecutableElement e, List<ExecutableElement> p) {
       if (e.getKind() == ElementKind.CONSTRUCTOR
@@ -224,34 +259,6 @@ final class AptUtils {
         p.add(e);
       }
       return null;
-    }
-
-  }
-
-  static final class IsAnnotation extends SimpleAnnotationValueVisitor8<Boolean, Void> {
-
-    static final AnnotationValueVisitor<Boolean, Void> INSTANCE = new IsAnnotation();
-
-    @Override
-    protected Boolean defaultAction(Object o, Void p) {
-      return false;
-    }
-
-    @Override
-    public Boolean visitAnnotation(AnnotationMirror a, Void p) {
-      return true;
-    }
-
-  }
-
-  static final class IsAnnotationMirrorArray extends SimpleAnnotationValueVisitor8<Boolean, AnnotationMirror> {
-
-    static final AnnotationValueVisitor<Boolean, AnnotationMirror> INSTANCE = new IsAnnotationMirrorArray();
-
-    @Override
-    public Boolean visitArray(List<? extends AnnotationValue> values, AnnotationMirror p) {
-      // TODO Auto-generated method stub
-      return super.visitArray(values, p);
     }
 
   }

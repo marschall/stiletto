@@ -72,6 +72,10 @@ import com.squareup.javapoet.TypeVariableName;
 @SupportedSourceVersion(RELEASE_8)
 public class ProxyGenerator extends AbstractProcessor {
 
+  static final String METHOD_CONSTANT_PREFIX = "M_";
+
+  static final String ANNOTATION_CONSTANT_PREFIX = "A_";
+
   private static final String EXECUTION_TIME_NANOS = "com.github.marschall.stiletto.api.injection.ExecutionTimeNanos";
 
   private static final String EXECUTION_TIME_MILLIS = "com.github.marschall.stiletto.api.injection.ExecutionTimeMillis";
@@ -176,6 +180,8 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private Elements elements;
 
+  private AnnotationValueUtils annotationValueUtils;
+
   private Types types;
 
   private boolean addSpringSupport;
@@ -187,6 +193,7 @@ public class ProxyGenerator extends AbstractProcessor {
     this.elements = this.processingEnv.getElementUtils();
     this.types = this.processingEnv.getTypeUtils();
     this.aptUtils = new AptUtils(this.types);
+    this.annotationValueUtils = new AnnotationValueUtils(this.types, this.elements);
     this.addGenerated = true;
     this.addSpringSupport = processingEnv.getOptions().getOrDefault("stiletto.spring", "false").equals("true");
 
@@ -405,7 +412,8 @@ public class ProxyGenerator extends AbstractProcessor {
 
     this.addConstructors(proxyToGenerate, proxyClassBilder);
 
-    TargetObjectContext targetObjectContext = new TargetObjectContext(proxyClassName);
+    TargetObjectContext targetObjectContext = new TargetObjectContext(proxyClassName, this.types, this.annotationValueUtils);
+
     List<MethodConstant> methodConstants = new ArrayList<>();
     for (ExecutableElement method : this.getMethodsToImplement(targetClass)) {
       JoinpointContext joinpointContext = this.implementMethod(proxyToGenerate, proxyClassBilder, targetObjectContext,
@@ -882,8 +890,7 @@ public class ProxyGenerator extends AbstractProcessor {
                   "more than one injection annotation present", adviceParameter);
           return argument;
         }
-        // TODO implement
-        argument = new ConstantArgument("null");
+        argument = this.buildDeclaredAnnotationArgument(adviceContext, annotationType);
       }
     }
 
@@ -938,6 +945,19 @@ public class ProxyGenerator extends AbstractProcessor {
     JoinpointContext joinpointContext = adviceContext.getJoinpointContext();
     String constantName = joinpointContext.getMethodConstantName();
     return new ConstantArgument(constantName);
+  }
+
+  private Argument buildDeclaredAnnotationArgument(AdviceContext adviceContext, DeclaredType annotationType) {
+    JoinpointContext joinpointContext = adviceContext.getJoinpointContext();
+    ExecutableElement joinpointElement = joinpointContext.getJoinpointElement();
+    for (AnnotationMirror annotationMirror : this.elements.getAllAnnotationMirrors(joinpointElement)) {
+      if (this.types.isSameType(annotationMirror.getAnnotationType(), annotationType)) {;
+      String constantName = joinpointContext.getTargetObjectContext().addAnnotationMirror(null);
+      return new ConstantArgument(constantName);
+      }
+    }
+    // TODO error handling
+    return null;
   }
 
   private Argument buildReturnValueArgument(AdviceContext adviceContext) {
@@ -1290,10 +1310,9 @@ public class ProxyGenerator extends AbstractProcessor {
     List<ExecutableElement> methods = new ArrayList<>();
     for (Element member : this.elements.getAllMembers(type)) {
       if (member.getKind() == ElementKind.METHOD) {
-        for (AnnotationMirror mirror : member.getAnnotationMirrors()) {
-          if (this.isSameType(mirror.getAnnotationType(), annotationType)) {
-            methods.add(this.aptUtils.asExecutableElement(member));
-          }
+        if (this.hasAnnotationMirror(member, annotationType)) {
+          methods.add(this.aptUtils.asExecutableElement(member));
+          continue;
         }
       }
     }
@@ -1482,17 +1501,16 @@ public class ProxyGenerator extends AbstractProcessor {
 
   static final class TargetObjectContext {
 
-    // constants for java.lang.reflect.Method
-    private final Set<String> methodConstants;
-
-    private final Map<String, Integer> methodCountsByName;
+    private final MethodConstants methodConstantContext;
 
     private final String proxyClassName;
 
-    TargetObjectContext(String proxyClassName) {
+    private final AnnotationConstants annotationConstants;
+
+    TargetObjectContext(String proxyClassName, Types types, AnnotationValueUtils utils) {
       this.proxyClassName = proxyClassName;
-      this.methodConstants = new HashSet<>();
-      this.methodCountsByName = new HashMap<>();
+      this.methodConstantContext = new MethodConstants();
+      this.annotationConstants = new AnnotationConstants(types, utils);
     }
 
     String getProxyClassName() {
@@ -1500,8 +1518,30 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     String generateMethodConstantName(String name) {
+      return this.methodConstantContext.generateMethodConstantName(name);
+    }
+
+    String addAnnotationMirror(AnnotationMirror annotationMirror) {
+      return this.annotationConstants.addAnnotationMirror(annotationMirror);
+    }
+
+  }
+
+  static final class MethodConstants {
+
+    // constants for java.lang.reflect.Method
+    private final Set<String> methodConstants;
+
+    private final Map<String, Integer> methodCountsByName;
+
+    MethodConstants() {
+      this.methodConstants = new HashSet<>();
+      this.methodCountsByName = new HashMap<>();
+    }
+
+    String generateMethodConstantName(String name) {
       int existingCount = this.methodCountsByName.getOrDefault(name, 0);
-      String generatedName = "M_" + name + '_' + existingCount;
+      String generatedName = METHOD_CONSTANT_PREFIX + name + '_' + existingCount;
       if (!this.methodConstants.add(generatedName)) {
         throw new IllegalStateException("name " + generatedName + " already present");
       }
@@ -1639,7 +1679,6 @@ public class ProxyGenerator extends AbstractProcessor {
       return this.targetObjectContext;
     }
 
-
     boolean needsCatch() {
       return false;
     }
@@ -1674,15 +1713,66 @@ public class ProxyGenerator extends AbstractProcessor {
 
   }
 
-  static final class AnnotationConstantKey {
+  static final class AnnotationConstants {
 
-    private final AnnotationMirror annotation;
+    private final List<AnnotationConstant> annotationConstants;
+    private final Types types;
+    private final AnnotationValueUtils utils;
+    private final Set<String> constantNames;
 
-    private final Map<String, AnnotationValue> values;
+    AnnotationConstants(Types types, AnnotationValueUtils utils) {
+      this.types = types;
+      this.utils = utils;
+      this.annotationConstants = new ArrayList<>(2);
+      this.constantNames = new HashSet<>(2);
+    }
 
-    AnnotationConstantKey(AnnotationMirror annotation, Map<String, AnnotationValue> values) {
-      this.annotation = annotation;
-      this.values = values;
+    String addAnnotationMirror(AnnotationMirror annotationMirror) {
+
+      for (AnnotationConstant constant : this.annotationConstants) {
+        AnnotationMirror exiting = constant.getAnnotationMirror();
+        if (!this.types.isSameType(exiting.getAnnotationType(), annotationMirror.getAnnotationType())) {
+          break;
+        }
+        if (this.utils.isEqual(exiting, annotationMirror)) {
+          return constant.getName();
+        }
+      }
+      String name = this.generateConstantName(annotationMirror);
+      this.annotationConstants.add(new AnnotationConstant(annotationMirror, name));
+      return name;
+    }
+
+    private String generateConstantName(AnnotationMirror annotationMirror) {
+      String name = annotationMirror.getAnnotationType().asElement().getSimpleName().toString();
+      String candidate = null;
+      boolean added = false;
+      int i = 1;
+      while (!added) {
+        candidate = ANNOTATION_CONSTANT_PREFIX + name + '_' + i++;
+        added = this.constantNames.add(candidate);
+      }
+      return candidate;
+    }
+
+  }
+
+  static final class AnnotationConstant {
+
+    private final AnnotationMirror annotationMirror;
+    private final String name;
+
+    AnnotationConstant(AnnotationMirror annotationMirror, String name) {
+      this.annotationMirror = annotationMirror;
+      this.name = name;
+    }
+
+    AnnotationMirror getAnnotationMirror() {
+      return annotationMirror;
+    }
+
+    String getName() {
+      return name;
     }
 
   }

@@ -1,6 +1,7 @@
 package com.github.marschall.stiletto.tests.injection;
 
 import java.math.BigDecimal;
+import java.nio.file.StandardOpenOption;
 
 import com.github.marschall.stiletto.api.advice.AfterReturning;
 import com.github.marschall.stiletto.api.generation.AdviseBy;
@@ -29,29 +30,33 @@ public interface InjectAllAnnotationValues {
 
           classValue = BigDecimal.class,
 
-          booleanArrayValue = {true, false},
+          enumValue = StandardOpenOption.APPEND,
 
-          byteArrayValue = {9, 10},
+          booleanValueArray = {true, false},
 
-          charArrayValue = {'1', '2'},
+          byteValueArray = {9, 10},
 
-          shortArrayValue = {13, 14},
+          charValueArray = {'1', '2'},
 
-          intArrayValue = {15, 16},
+          shortValueArray = {13, 14},
 
-          longArrayValue = {17, 18},
+          intValueArray = {15, 16},
 
-          floatArrayValue = {19, 20},
+          longValueArray = {17, 18},
 
-          doubleArrayValue = {21, 22},
+          floatValueArray = {19, 20},
 
-          stringArrayValue= {"23", "24"},
+          doubleValueArray = {21, 22},
 
-          classArrayValue = {Integer.class, Long.class},
+          stringValueArray = {"23", "24"},
+
+          classValueArray = {Integer.class, Long.class},
+
+          enumValueArray = {StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.DSYNC},
 
           annotationValue = @AfterReturning,
 
-          annotationArrayValue = {@AfterReturning, @AfterReturning}
+          annotationValueArray = {@AfterReturning, @AfterReturning}
   )
   void method();
 

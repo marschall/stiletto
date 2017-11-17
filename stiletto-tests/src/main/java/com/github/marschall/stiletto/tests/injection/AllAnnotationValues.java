@@ -1,5 +1,7 @@
 package com.github.marschall.stiletto.tests.injection;
 
+import java.nio.file.StandardOpenOption;
+
 import com.github.marschall.stiletto.api.advice.AfterReturning;
 
 public @interface AllAnnotationValues {
@@ -22,30 +24,34 @@ public @interface AllAnnotationValues {
 
   String stringValue();
 
+  StandardOpenOption enumValue();
+
   Class<? extends Number> classValue();
 
-  boolean[] booleanArrayValue();
+  boolean[] booleanValueArray();
 
-  byte[] byteArrayValue();
+  byte[] byteValueArray();
 
-  char[] charArrayValue();
+  char[] charValueArray();
 
-  short[] shortArrayValue();
+  short[] shortValueArray();
 
-  int[] intArrayValue();
+  int[] intValueArray();
 
-  long[] longArrayValue();
+  long[] longValueArray();
 
-  float[] floatArrayValue();
+  float[] floatValueArray();
 
-  double[] doubleArrayValue();
+  double[] doubleValueArray();
 
-  String[] stringArrayValue();
+  String[] stringValueArray();
 
-  Class<? extends Number>[] classArrayValue();
+  Class<? extends Number>[] classValueArray();
+
+  StandardOpenOption[] enumValueArray();
 
   AfterReturning annotationValue();
 
-  AfterReturning[] annotationArrayValue();
+  AfterReturning[] annotationValueArray();
 
 }
