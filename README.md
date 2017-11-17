@@ -1,6 +1,6 @@
 An AOP weaver that uses source file generation.
 
-** not yet working **
+**not yet working**
 
 AOP without runtime reflection.
 AOP without runtime bytecode generation.
@@ -14,10 +14,10 @@ No
 - ClassLoader tricks (#defineClass, Unsafe)
 - runtime reflection
 - framework or container dependencies (apart from annotations and interfaces)
-- (runtime) bytecode generation -> no source
+- (runtime) bytecode generation → no source
 - ThreadLocal hacks
 - runtime library
-- framework dependenices (other than annotations or interfaces) -> easy to migrate to something else
+- framework dependenices (other than annotations or interfaces) → easy to migrate to something else
 
 But
 --
@@ -27,9 +27,9 @@ Advantages
 ----------
 - annotations on target class can have retention source
 - minimize allocations
- - often intermediate allocations can be avoided
- - expressions can be evaluated at compile time and be a constant at runtime
-- smaller, simpler methods -> easier to inline -> more likely to optimize
+  - often intermediate allocations can be avoided
+  - expressions can be evaluated at compile time and be a constant at runtime
+- smaller, simpler methods → easier to inline → more likely to optimize
 
 Advantages of avoiding @Around
 -------------------------------
@@ -54,12 +54,12 @@ Downsides of Spring AOP
 Performance Downsides of Spring AOP
 -----------------------------------
 - more allocation
--- increased allocation pressure
--- more frequent garbage collection
+  - increased allocation pressure
+  - more frequent garbage collection
 - more stack usage
--- need for bigger stacks
--- increased root set scanning times
-- code unlikely to inline -> key HotSpot optimization, gateway to other optimizations
+  - need for bigger stacks
+  - increased root set scanning times
+- code unlikely to inline → key HotSpot optimization, gateway to other optimizations
 
 
 
@@ -78,12 +78,12 @@ org.springframework.dao.support.PersistenceExceptionTranslationInterceptor
 
 not proxied:
 - common interfaces:
--- Cloneable, Serializable, Externalizable, Comparable
+  - Cloneable, Serializable, Externalizable, Comparable
 - Object methods
--- equals, hashCode -> can't guarantee symmetry
--- toString
--- clone
--- finalize, pointless
+  - equals, hashCode → can't guarantee symmetry
+  - toString
+  - clone
+  - finalize, pointless
 
 Unsure:
 - use Supplier instead of ActualMethodCall
