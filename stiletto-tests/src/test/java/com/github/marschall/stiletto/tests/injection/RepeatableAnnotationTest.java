@@ -8,18 +8,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class RepeatableAnnotationServiceTest {
+public class RepeatableAnnotationTest {
 
-  private RepeatableAnnotationAspect aspect;
-  private RepeatableAnnotationService proxy;
+  private CaptureRepeatableAnnotationAspect aspect;
+  private InjectRepeatableAnnotation proxy;
 
   @BeforeEach
   public void setUp() {
-    this.aspect = new RepeatableAnnotationAspect();
-    RepeatableAnnotationService targetObject = new RepeatableAnnotationService();
-    // FIXME
-//    this.proxy = new RepeatableAnnotationService_(targetObject, this.aspect);
-    this.proxy = targetObject;
+    this.aspect = new CaptureRepeatableAnnotationAspect();
+    InjectRepeatableAnnotation targetObject = new InjectRepeatableAnnotation();
+    this.proxy = new InjectRepeatableAnnotation_(targetObject, this.aspect);
   }
 
   @Test

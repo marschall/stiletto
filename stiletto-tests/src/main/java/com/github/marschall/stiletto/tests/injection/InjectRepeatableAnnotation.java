@@ -1,6 +1,9 @@
 package com.github.marschall.stiletto.tests.injection;
 
-public class RepeatableAnnotationService {
+import com.github.marschall.stiletto.api.generation.AdviseBy;
+
+@AdviseBy(CaptureRepeatableAnnotationAspect.class)
+public class InjectRepeatableAnnotation {
 
   @RepeatableElement("singleAnnoation")
   public void singleAnnoation() {

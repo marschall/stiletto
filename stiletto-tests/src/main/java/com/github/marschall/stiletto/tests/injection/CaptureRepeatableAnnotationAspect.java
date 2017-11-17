@@ -3,7 +3,7 @@ package com.github.marschall.stiletto.tests.injection;
 import com.github.marschall.stiletto.api.advice.Before;
 import com.github.marschall.stiletto.api.injection.DeclaredAnnotation;
 
-public class RepeatableAnnotationAspect {
+public class CaptureRepeatableAnnotationAspect {
 
   private RepeatableContainer container;
   private RepeatableElement[] elements;
