@@ -425,6 +425,7 @@ public class ProxyGenerator extends AbstractProcessor {
     }
 
     this.addMethodConstants(proxyClassBilder, proxyToGenerate, methodConstants);
+    this.addAnnotationConstants(proxyClassBilder, targetObjectContext.getAnnotationConstants());
 
     TypeSpec proxyClass = proxyClassBilder.build();
 
@@ -712,6 +713,37 @@ public class ProxyGenerator extends AbstractProcessor {
       .endControlFlow();
 
     proxyClassBilder.addStaticBlock(initializerBuilder.build());
+  }
+
+  private void addAnnotationConstants(Builder proxyClassBilder, List<AnnotationConstant> annotationConstants) {
+    for (AnnotationConstant annotationConstant : annotationConstants) {
+
+      // static final class Transactional_Class implements Transactional {
+      //
+      // }
+
+      AnnotationMirror annotationMirror = annotationConstant.getAnnotationMirror();
+      DeclaredType annotationType = annotationMirror.getAnnotationType();
+      String annotationClassName = this.generateAnnotationClassName(annotationConstant.getName(), annotationType);
+
+      TypeSpec typeSpec = TypeSpec.classBuilder(annotationClassName)
+              .addSuperinterface(TypeName.get(annotationType))
+              .addModifiers(STATIC, FINAL)
+              .build();
+      proxyClassBilder.addType(typeSpec);
+
+      // private static final Transactional T_1 = new Transactional_Class();
+      TypeName type = TypeName.get(annotationConstant.getAnnotationMirror().getAnnotationType());
+      String name = annotationConstant.getName();
+      proxyClassBilder.addField(FieldSpec.builder(type, name, PRIVATE, STATIC, FINAL)
+              // TODO should use new $T()
+              .initializer("new " + annotationClassName + "()")
+              .build());
+    }
+  }
+
+  private String generateAnnotationClassName(String constantName, DeclaredType annotationType) {
+    return constantName + "_Class";
   }
 
   private void addMethodConstant(com.squareup.javapoet.CodeBlock.Builder initializerBuilder, ProxyToGenerate proxyToGenerate, MethodConstant methodConstant) {
@@ -1533,6 +1565,10 @@ public class ProxyGenerator extends AbstractProcessor {
       return this.annotationConstants.addAnnotationMirror(annotationMirror);
     }
 
+    List<AnnotationConstant> getAnnotationConstants() {
+      return this.annotationConstants.getAnnotationConstants();
+    }
+
   }
 
   static final class MethodConstants {
@@ -1761,6 +1797,10 @@ public class ProxyGenerator extends AbstractProcessor {
         added = this.constantNames.add(candidate);
       }
       return candidate;
+    }
+
+    List<AnnotationConstant> getAnnotationConstants() {
+      return annotationConstants;
     }
 
   }
