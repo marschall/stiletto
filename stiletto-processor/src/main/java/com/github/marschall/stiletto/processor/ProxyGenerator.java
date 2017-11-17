@@ -13,12 +13,14 @@ import java.io.IOException;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
@@ -33,6 +35,7 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
+import javax.lang.model.element.AnnotationValueVisitor;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -47,6 +50,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.SimpleElementVisitor8;
 import javax.lang.model.util.Types;
@@ -717,29 +721,53 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private void addAnnotationConstants(Builder proxyClassBilder, List<AnnotationConstant> annotationConstants) {
     for (AnnotationConstant annotationConstant : annotationConstants) {
-
-      // static final class Transactional_Class implements Transactional {
-      //
-      // }
-
-      AnnotationMirror annotationMirror = annotationConstant.getAnnotationMirror();
-      DeclaredType annotationType = annotationMirror.getAnnotationType();
-      String annotationClassName = this.generateAnnotationClassName(annotationConstant.getName(), annotationType);
-
-      TypeSpec typeSpec = TypeSpec.classBuilder(annotationClassName)
-              .addSuperinterface(TypeName.get(annotationType))
-              .addModifiers(STATIC, FINAL)
-              .build();
-      proxyClassBilder.addType(typeSpec);
-
-      // private static final Transactional T_1 = new Transactional_Class();
-      TypeName type = TypeName.get(annotationConstant.getAnnotationMirror().getAnnotationType());
-      String name = annotationConstant.getName();
-      proxyClassBilder.addField(FieldSpec.builder(type, name, PRIVATE, STATIC, FINAL)
-              // TODO should use new $T()
-              .initializer("new " + annotationClassName + "()")
-              .build());
+      String annotationClassName = addAnnotationClass(proxyClassBilder, annotationConstant);
+      addAnnotationConstant(proxyClassBilder, annotationConstant, annotationClassName);
     }
+  }
+
+  private void addAnnotationConstant(Builder proxyClassBilder, AnnotationConstant annotationConstant, String annotationClassName) {
+
+    // private static final Transactional T_1 = new Transactional_Class();
+    TypeName type = TypeName.get(annotationConstant.getAnnotationMirror().getAnnotationType());
+    String name = annotationConstant.getName();
+    proxyClassBilder.addField(FieldSpec.builder(type, name, PRIVATE, STATIC, FINAL)
+            // TODO should use new $T()
+            .initializer("new " + annotationClassName + "()")
+            .build());
+  }
+
+  private String addAnnotationClass(Builder proxyClassBilder, AnnotationConstant annotationConstant) {
+
+
+    // static final class Transactional_Class implements Transactional {
+    //
+    // }
+    AnnotationMirror annotationMirror = annotationConstant.getAnnotationMirror();
+    DeclaredType annotationType = annotationMirror.getAnnotationType();
+    String annotationClassName = this.generateAnnotationClassName(annotationConstant.getName(), annotationType);
+
+    Builder classBuilder = TypeSpec.classBuilder(annotationClassName)
+            .addSuperinterface(TypeName.get(annotationType))
+            .addModifiers(STATIC, FINAL);
+
+    for (Entry<? extends ExecutableElement, ? extends AnnotationValue> annotationMethod : this.elements.getElementValuesWithDefaults(annotationMirror).entrySet()) {
+      implementAnnotationMethod(classBuilder, annotationMethod);
+    }
+
+    proxyClassBilder.addType(classBuilder.build());
+    return annotationClassName;
+  }
+
+  private void implementAnnotationMethod(Builder classBuilder, Entry<? extends ExecutableElement, ? extends AnnotationValue> annotationMethod) {
+    // TODO Annotation or Annotation array
+    AnnotationValue annotationValue = annotationMethod.getValue();
+    TypeMirror returnType = annotationMethod.getKey().getReturnType();
+    FormattedArguments argument = LiteralGenerator.INSTANCE.visit(annotationValue, returnType);
+    classBuilder.addMethod(MethodSpec.overriding(annotationMethod.getKey())
+            .addStatement("return " + argument.getFormat(), argument.getFormatParameters().toArray())
+            .build());
+
   }
 
   private String generateAnnotationClassName(String constantName, DeclaredType annotationType) {
@@ -1110,19 +1138,19 @@ public class ProxyGenerator extends AbstractProcessor {
 
   static final class FormattedArgument extends Argument {
 
-    private final String value;
+    private final String format;
 
     private final Object formatParameter;
 
-    FormattedArgument(String value, Object formatParameter) {
-      Objects.requireNonNull(value);
-      this.value = value;
+    FormattedArgument(String format, Object formatParameter) {
+      Objects.requireNonNull(format);
+      this.format = format;
       this.formatParameter = formatParameter;
     }
 
     @Override
     void addValueTo(StringBuilder buffer) {
-      buffer.append(this.value);
+      buffer.append(this.format);
     }
 
     @Override
@@ -1132,7 +1160,37 @@ public class ProxyGenerator extends AbstractProcessor {
 
     @Override
     public String toString() {
-      return this.value + "%" + this.formatParameter;
+      return this.format + " % " + this.formatParameter;
+    }
+
+  }
+
+  static final class FormattedArguments {
+
+    private final String format;
+
+    private final List<Object> formatParameters;
+
+    FormattedArguments(String format, List<Object> formatParameters) {
+      Objects.requireNonNull(format);
+      Objects.requireNonNull(formatParameters);
+      this.format = format;
+      this.formatParameters = formatParameters;
+    }
+
+    FormattedArguments(String format, Object formatParameter) {
+      Objects.requireNonNull(format);
+      Objects.requireNonNull(formatParameter);
+      this.format = format;
+      this.formatParameters = Collections.singletonList(formatParameter);
+    }
+
+    String getFormat() {
+      return this.format;
+    }
+
+    List<Object> getFormatParameters() {
+      return this.formatParameters;
     }
 
   }
@@ -1773,6 +1831,8 @@ public class ProxyGenerator extends AbstractProcessor {
 
     String addAnnotationMirror(AnnotationMirror annotationMirror) {
 
+      // TODO annotation or annotation array first
+
       for (AnnotationConstant constant : this.annotationConstants) {
         AnnotationMirror exiting = constant.getAnnotationMirror();
         if (!this.types.isSameType(exiting.getAnnotationType(), annotationMirror.getAnnotationType())) {
@@ -1821,6 +1881,93 @@ public class ProxyGenerator extends AbstractProcessor {
 
     String getName() {
       return name;
+    }
+
+  }
+
+  static final class LiteralGenerator extends AbstractAnnotationValueVisitor8<FormattedArguments, TypeMirror> {
+
+    static final AnnotationValueVisitor<FormattedArguments, TypeMirror> INSTANCE = new LiteralGenerator();
+
+    @Override
+    public FormattedArguments visitBoolean(boolean b, TypeMirror p) {
+      return new FormattedArguments("$L", b);
+    }
+
+    @Override
+    public FormattedArguments visitByte(byte b, TypeMirror p) {
+      return new FormattedArguments("$L", b);
+    }
+
+    @Override
+    public FormattedArguments visitChar(char c, TypeMirror p) {
+      return new FormattedArguments("%L", c);
+    }
+
+    @Override
+    public FormattedArguments visitDouble(double d, TypeMirror p) {
+      return new FormattedArguments("$L", d);
+    }
+
+    @Override
+    public FormattedArguments visitFloat(float f, TypeMirror p) {
+      return new FormattedArguments("$L", f);
+    }
+
+    @Override
+    public FormattedArguments visitInt(int i, TypeMirror p) {
+      return new FormattedArguments("$L", i);
+    }
+
+    @Override
+    public FormattedArguments visitLong(long l, TypeMirror p) {
+      return new FormattedArguments("$L", l);
+    }
+
+    @Override
+    public FormattedArguments visitShort(short s, TypeMirror p) {
+      return new FormattedArguments("$L", s);
+    }
+
+    @Override
+    public FormattedArguments visitString(String s, TypeMirror p) {
+      return new FormattedArguments("$S", s);
+    }
+
+    @Override
+    public FormattedArguments visitType(TypeMirror t, TypeMirror p) {
+      return new FormattedArguments("$T.class", t);
+    }
+
+    @Override
+    public FormattedArguments visitEnumConstant(VariableElement c, TypeMirror p) {
+      return new FormattedArguments("$T.$N", Arrays.asList(c.asType(), ParameterSpec.get(c)));
+    }
+
+    @Override
+    public FormattedArguments visitAnnotation(AnnotationMirror a, TypeMirror p) {
+      // TODO Auto-generated method stub
+      return null;
+    }
+
+    @Override
+    public FormattedArguments visitArray(List<? extends AnnotationValue> values, TypeMirror p) {
+      // TODO constant
+      StringBuilder buffer = new StringBuilder("new $T {");
+      List<Object> parameters = new ArrayList<>(values.size() + 1);
+      parameters.add(p);
+      for (int i = 0; i < values.size(); i++) {
+        if (i != 0) {
+          buffer.append(", ");
+        }
+        AnnotationValue value = values.get(i);
+        // multi dimensional arrays are not allowed so we should be fine
+        FormattedArguments argument = LiteralGenerator.INSTANCE.visit(value, null);
+        buffer.append(argument.getFormat());
+        parameters.addAll(argument.getFormatParameters());
+      }
+      buffer.append('}');
+      return new FormattedArguments(buffer.toString(), parameters);
     }
 
   }

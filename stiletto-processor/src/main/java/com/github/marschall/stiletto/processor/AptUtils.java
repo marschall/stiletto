@@ -238,8 +238,8 @@ final class AptUtils {
     }
 
     @Override
-    public List<? extends AnnotationValue> visitArray(List<? extends AnnotationValue> vals, Void p) {
-      return vals;
+    public List<? extends AnnotationValue> visitArray(List<? extends AnnotationValue> values, Void p) {
+      return values;
     }
 
   }

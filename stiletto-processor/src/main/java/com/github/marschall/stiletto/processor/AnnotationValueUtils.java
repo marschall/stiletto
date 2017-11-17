@@ -354,13 +354,13 @@ public class AnnotationValueUtils {
     }
 
     @Override
-    public Boolean visitArray(List<? extends AnnotationValue> vals, List<? extends AnnotationValue> p) {
-      if (vals.size() != p.size()) {
+    public Boolean visitArray(List<? extends AnnotationValue> values, List<? extends AnnotationValue> p) {
+      if (values.size() != p.size()) {
         return false;
       }
       IsAnnotationValueEqual isEqual = new IsAnnotationValueEqual(this.types, this.elements);
-      for (int i = 0; i < vals.size(); i++) {
-        AnnotationValue a = vals.get(i);
+      for (int i = 0; i < values.size(); i++) {
+        AnnotationValue a = values.get(i);
         AnnotationValue b = p.get(i);
 
         boolean equal = isEqual.visit(a, b);
@@ -388,7 +388,7 @@ public class AnnotationValueUtils {
     }
 
     @Override
-    public Boolean visitArray(List<? extends AnnotationValue> vals, Void p) {
+    public Boolean visitArray(List<? extends AnnotationValue> values, Void p) {
       return true;
     }
 
