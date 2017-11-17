@@ -762,6 +762,11 @@ public class ProxyGenerator extends AbstractProcessor {
       implementAnnotationMethod(classBuilder, annotationMethod);
     }
 
+    ExecutableElement annotationTypeMethod = this.getNoArgumentMethod(annotationType.asElement(), "annotationType");
+    classBuilder.addMethod(MethodSpec.overriding(annotationTypeMethod)
+            .addStatement("return $T.class", annotationType)
+            .build());
+
     proxyClassBilder.addType(classBuilder.build());
     return annotationClassName;
   }
@@ -1007,6 +1012,19 @@ public class ProxyGenerator extends AbstractProcessor {
     }
     // TODO messager?
     throw new IllegalStateException("no non-default method found in");
+  }
+
+  private ExecutableElement getNoArgumentMethod(Element element, String methodName) {
+    for (Element member : this.elements.getAllMembers(this.aptUtils.asTypeElement(element))) {
+      if (member.getKind() == ElementKind.METHOD) {
+        ExecutableElement method = this.aptUtils.asExecutableElement(member);
+        if (method.getParameters().isEmpty() && method.getSimpleName().contentEquals(methodName)) {
+          return method;
+        }
+      }
+    }
+    // TODO messager?
+    throw new IllegalStateException("no method " + methodName + "() found in");
   }
 
   private Argument buildJoinpointArgument(AdviceContext adviceContext) {
@@ -1917,7 +1935,7 @@ public class ProxyGenerator extends AbstractProcessor {
 
     @Override
     public FormattedArguments visitChar(char c, TypeMirror p) {
-      return new FormattedArguments("%L", c);
+      return new FormattedArguments("$L", c);
     }
 
     @Override
