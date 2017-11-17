@@ -890,7 +890,7 @@ public class ProxyGenerator extends AbstractProcessor {
                   "more than one injection annotation present", adviceParameter);
           return argument;
         }
-        argument = this.buildDeclaredAnnotationArgument(adviceContext, annotationType);
+        argument = this.buildDeclaredAnnotationArgument(adviceContext, adviceParameter);
       }
     }
 
@@ -947,13 +947,21 @@ public class ProxyGenerator extends AbstractProcessor {
     return new ConstantArgument(constantName);
   }
 
-  private Argument buildDeclaredAnnotationArgument(AdviceContext adviceContext, DeclaredType annotationType) {
+  private Argument buildDeclaredAnnotationArgument(AdviceContext adviceContext, VariableElement adviceParameter) {
     JoinpointContext joinpointContext = adviceContext.getJoinpointContext();
     ExecutableElement joinpointElement = joinpointContext.getJoinpointElement();
+    TypeMirror annotationType = adviceParameter.asType();
     for (AnnotationMirror annotationMirror : this.elements.getAllAnnotationMirrors(joinpointElement)) {
-      if (this.types.isSameType(annotationMirror.getAnnotationType(), annotationType)) {;
-      String constantName = joinpointContext.getTargetObjectContext().addAnnotationMirror(null);
-      return new ConstantArgument(constantName);
+      if (this.types.isSameType(annotationMirror.getAnnotationType(), annotationType)) {
+        String constantName = joinpointContext.getTargetObjectContext().addAnnotationMirror(annotationMirror);
+        return new ConstantArgument(constantName);
+      }
+    }
+    // not found on method, search on class
+    for (AnnotationMirror annotationMirror : this.elements.getAllAnnotationMirrors(joinpointElement.getEnclosingElement())) {
+      if (this.types.isSameType(annotationMirror.getAnnotationType(), annotationType)) {
+        String constantName = joinpointContext.getTargetObjectContext().addAnnotationMirror(annotationMirror);
+        return new ConstantArgument(constantName);
       }
     }
     // TODO error handling
