@@ -11,7 +11,6 @@ import static javax.lang.model.element.Modifier.STATIC;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,7 +34,6 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
-import javax.lang.model.element.AnnotationValueVisitor;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -46,6 +44,7 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeKind;
@@ -190,6 +189,12 @@ public class ProxyGenerator extends AbstractProcessor {
 
   private boolean addSpringSupport;
 
+  // java.lang.annotation.Annotation
+  private TypeMirror annotationType;
+
+  // java.lang.Class
+  private TypeMirror classType;
+
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
@@ -210,7 +215,9 @@ public class ProxyGenerator extends AbstractProcessor {
     this.adviseByValueMethod = this.getValueMethod(adviseBy);
     this.intType = this.types.getPrimitiveType(TypeKind.INT);
     this.longType = this.types.getPrimitiveType(TypeKind.LONG);
-    this.objectType = this.getTypeElement("java.lang.Object").asType();
+    this.objectType = this.asTypeMirror("java.lang.Object");
+    this.annotationType = this.asTypeMirror("java.lang.annotation.Annotation");
+    this.classType = this.asTypeMirror("java.lang.Class");
 
     TypeElement evaluateElement = this.getTypeElement(EVALUATE);
     this.evaluateValueMethod = this.getValueMethod(evaluateElement);
@@ -763,7 +770,8 @@ public class ProxyGenerator extends AbstractProcessor {
     // TODO Annotation or Annotation array
     AnnotationValue annotationValue = annotationMethod.getValue();
     TypeMirror returnType = annotationMethod.getKey().getReturnType();
-    FormattedArguments argument = LiteralGenerator.INSTANCE.visit(annotationValue, returnType);
+    LiteralGenerator literalGenerator = new LiteralGenerator(this.aptUtils, this.types, this.classType);
+    FormattedArguments argument = literalGenerator.visit(annotationValue, returnType);
     classBuilder.addMethod(MethodSpec.overriding(annotationMethod.getKey())
             .addStatement("return " + argument.getFormat(), argument.getFormatParameters().toArray())
             .build());
@@ -1487,7 +1495,7 @@ public class ProxyGenerator extends AbstractProcessor {
     DeclaredType declaredType = this.aptUtils.asDeclaredType(typeMirror);
     TypeElement typeElement = this.aptUtils.asTypeElement(declaredType.asElement());
     TypeMirror superclass = typeElement.getSuperclass();
-    return isSameType(this.elements.getTypeElement(Annotation.class.getName()), superclass);
+    return isSameType(this.annotationType, superclass);
   }
 
   private boolean isFinalObjectMethod(ExecutableElement method) {
@@ -1887,7 +1895,15 @@ public class ProxyGenerator extends AbstractProcessor {
 
   static final class LiteralGenerator extends AbstractAnnotationValueVisitor8<FormattedArguments, TypeMirror> {
 
-    static final AnnotationValueVisitor<FormattedArguments, TypeMirror> INSTANCE = new LiteralGenerator();
+    private final AptUtils aptUtils;
+    private final Types types;
+    private final TypeMirror classType;
+
+    LiteralGenerator(AptUtils aptUtils, Types types, TypeMirror classType) {
+      this.aptUtils = aptUtils;
+      this.types = types;
+      this.classType = classType;
+    }
 
     @Override
     public FormattedArguments visitBoolean(boolean b, TypeMirror p) {
@@ -1953,16 +1969,26 @@ public class ProxyGenerator extends AbstractProcessor {
     @Override
     public FormattedArguments visitArray(List<? extends AnnotationValue> values, TypeMirror p) {
       // TODO constant
-      StringBuilder buffer = new StringBuilder("new $T {");
       List<Object> parameters = new ArrayList<>(values.size() + 1);
-      parameters.add(p);
+
+      StringBuilder buffer = new StringBuilder();
+      ArrayType arrayType = this.aptUtils.asArrayType(p);
+      if (this.types.isAssignable(arrayType, this.classType)) {
+        // avoid generic array creation
+        buffer.append("new ($T) $T {");
+        parameters.add(p);
+        parameters.add(this.types.erasure(arrayType));
+      } else {
+        buffer.append("new $T {");
+        parameters.add(p);
+      }
       for (int i = 0; i < values.size(); i++) {
         if (i != 0) {
           buffer.append(", ");
         }
         AnnotationValue value = values.get(i);
         // multi dimensional arrays are not allowed so we should be fine
-        FormattedArguments argument = LiteralGenerator.INSTANCE.visit(value, null);
+        FormattedArguments argument = this.visit(value, null);
         buffer.append(argument.getFormat());
         parameters.addAll(argument.getFormatParameters());
       }

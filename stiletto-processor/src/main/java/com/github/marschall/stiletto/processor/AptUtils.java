@@ -14,6 +14,7 @@ import javax.lang.model.element.ElementVisitor;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -70,6 +71,10 @@ final class AptUtils {
 
   DeclaredType asDeclaredType(TypeMirror type) {
     return type.accept(DeclaredTypeExtractor.INSTANCE, null);
+  }
+
+  ArrayType asArrayType(TypeMirror type) {
+    return type.accept(ArrayTypeExtractor.INSTANCE, null);
   }
 
   TypeElement asTypeElement(Element element) {
@@ -166,6 +171,21 @@ final class AptUtils {
 
     @Override
     public DeclaredType visitDeclared(DeclaredType t, Void p) {
+      return t;
+    }
+
+  }
+
+  static final class ArrayTypeExtractor extends ExpectedTypeExtractor<ArrayType> {
+
+    static final TypeVisitor<ArrayType, Void> INSTANCE = new ArrayTypeExtractor();
+
+    private ArrayTypeExtractor() {
+      super();
+    }
+
+    @Override
+    public ArrayType visitArray(ArrayType t, Void p) {
       return t;
     }
 
