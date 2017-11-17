@@ -5,6 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
 import java.nio.file.StandardOpenOption;
 
@@ -24,11 +29,12 @@ public class DeclaredAnnotationTest {
   }
 
   @Test
-  public void allAnnotationValues() {
+  public void allAnnotationValues() throws ClassNotFoundException, IOException {
     this.proxy.method();
 
     AllAnnotationValues annotation = this.aspect.getAnnotation();
     assertNotNull(annotation);
+    assertSerialiable(annotation);
 
     assertEquals(true, annotation.booleanValue());
     assertEquals(1, annotation.byteValue());
@@ -57,6 +63,24 @@ public class DeclaredAnnotationTest {
     // TODO better assertion
     assertNotNull(annotation.annotationValue());
     assertNotNull(annotation.annotationValueArray());
+  }
+
+  private void assertSerialiable(Object obj) throws IOException, ClassNotFoundException {
+    assertNotNull(obj);
+    Object copy = serialiableCopy(obj);
+    assertNotNull(copy);
+    assertSame(obj.getClass(), copy.getClass());
+  }
+
+  private Object serialiableCopy(Object obj) throws IOException, ClassNotFoundException {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    try (ObjectOutputStream stream = new ObjectOutputStream(output)) {
+      stream.writeObject(obj);
+    }
+    try (ByteArrayInputStream input = new ByteArrayInputStream(output.toByteArray());
+         ObjectInputStream stream = new ObjectInputStream(input)) {
+      return stream.readObject();
+    }
   }
 
 }

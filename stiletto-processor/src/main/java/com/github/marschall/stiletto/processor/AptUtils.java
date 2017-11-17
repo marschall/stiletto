@@ -89,6 +89,15 @@ final class AptUtils {
     return annotationValue.accept(TypeMirrorExtractor.INSTANCE, null);
   }
 
+  List<AnnotationMirror> asAnnotationMirrors(AnnotationValue annotationValue) {
+    List<? extends AnnotationValue> values = ArrayValueExtractor.INSTANCE.visit(annotationValue);
+    List<AnnotationMirror> mirrors = new ArrayList<>(values.size());
+    for (AnnotationValue value : values) {
+      mirrors.add(asAnnotationMirror(value));
+    }
+    return mirrors;
+  }
+
   String asString(AnnotationValue annotationValue) {
     return annotationValue.accept(StringExtractor.INSTANCE, null);
   }
@@ -245,6 +254,21 @@ final class AptUtils {
     @Override
     public AnnotationMirror visitAnnotation(AnnotationMirror a, Void p) {
       return a;
+    }
+
+  }
+
+  static final class ArrayValueExtractor extends ExpectedValueExtractor<List<? extends AnnotationValue>> {
+
+    static final AnnotationValueVisitor<List<? extends AnnotationValue>, Void> INSTANCE = new ArrayValueExtractor();
+
+    private ArrayValueExtractor() {
+      super();
+    }
+
+    @Override
+    public List<? extends AnnotationValue> visitArray(List<? extends AnnotationValue> values, Void p) {
+      return values;
     }
 
   }
