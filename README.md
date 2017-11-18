@@ -11,7 +11,7 @@ No
 --
 - hard to understand stack traces
 - stepping through methods with no source
-- ClassLoader tricks (#defineClass, Unsafe)
+- ClassLoader tricks (#defineClass, Unsafe)  → 100% protable code (other JVMs, containers/middleware, security manager, OSGi…)
 - runtime reflection
 - framework or container dependencies (apart from annotations and interfaces)
 - (runtime) bytecode generation → no source
@@ -20,7 +20,7 @@ No
 - framework dependenices (other than annotations or interfaces) → easy to migrate to something else
 
 But
---
+---
 - instantiation where unavoidable
 
 Advantages
@@ -72,6 +72,7 @@ https://dzone.com/articles/filtering-stack-trace-hell
 http://hannesdorfmann.com/annotation-processing/annotationprocessing101
 
 events
+
 https://spring.io/blog/2015/02/11/better-application-events-in-spring-framework-4-2
 
 org.springframework.dao.support.PersistenceExceptionTranslationInterceptor
