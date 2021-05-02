@@ -53,6 +53,12 @@ public class TransactionAspect2 {
     }
 
     @Override
+    public String timeoutString() {
+      // TODO Auto-generated method stub
+      return null;
+    }
+
+    @Override
     public boolean readOnly() {
       // TODO Auto-generated method stub
       return false;
@@ -78,6 +84,12 @@ public class TransactionAspect2 {
 
     @Override
     public String[] noRollbackForClassName() {
+      // TODO Auto-generated method stub
+      return null;
+    }
+
+    @Override
+    public String[] label() {
       // TODO Auto-generated method stub
       return null;
     }

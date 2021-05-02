@@ -86,6 +86,11 @@ public class TransactionalAspectTest {
     }
 
     @Override
+    public String timeoutString() {
+      return "";
+    }
+
+    @Override
     public boolean readOnly() {
       return false;
     }
@@ -108,6 +113,11 @@ public class TransactionalAspectTest {
     @Override
     public String[] noRollbackForClassName() {
       return this.noRollbackForClassName;
+    }
+
+    @Override
+    public String[] label() {
+      return new String[0];
     }
 
   }
